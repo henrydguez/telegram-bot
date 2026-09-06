@@ -17,7 +17,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def responder_hola(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.text and update.message.text.lower().strip() == "hola":
-        await update.message.reply_text("Hola, ¿cómo estás?")
+        await update.message.reply_text("Hola, ¿cómo estás? 😜")
 
 
 app = Application.builder().token(TOKEN).build()
