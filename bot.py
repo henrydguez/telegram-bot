@@ -7,7 +7,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
-MINI_APP_URL = "https://henrydguez.github.io/telegram-bot/mini_app/"
+MINI_APP_URL = "https://henrydguez.github.io/telegram-bot/"
 
 if not TOKEN:
     raise RuntimeError("No se encontró BOT_TOKEN en el archivo .env")
