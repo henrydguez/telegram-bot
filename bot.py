@@ -62,7 +62,7 @@ async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         response = await openai_client.responses.create(
-            model="gpt-5.6",
+            model="gpt-5.6-luna",
             instructions=SYSTEM_PROMPT,
             input=mensaje,
             max_output_tokens=500,
