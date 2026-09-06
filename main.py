@@ -21,25 +21,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def obtener_tasa_eur_cop():
     """Obtiene la cotización EUR/COP visible en Google Finance."""
     url = "https://www.google.com/finance/quote/EUR-COP?hl=es"
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": "Mozilla/5.0"},
-    )
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
 
     with urllib.request.urlopen(request, timeout=10) as response:
         html = response.read().decode("utf-8", errors="ignore")
 
-    # Google Finance puede cambiar sus clases CSS. Buscamos la cotización
-    # alrededor del texto EUR / COP y también mantenemos un respaldo.
+    # Quitamos etiquetas HTML para poder buscar el texto que Google muestra.
+    texto = re.sub(r"<script.*?</script>|<style.*?</style>", " ", html, flags=re.IGNORECASE | re.DOTALL)
+    texto = re.sub(r"<[^>]+>", " ", texto)
+    texto = re.sub(r"\s+", " ", texto)
+
+    # Google muestra actualmente algo como: EUR / COP ... Euro / Peso colombiano ... 3.647,4000
     patrones = [
-        r"EUR\s*/\s*COP.{0,5000}?([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]+)?)",
-        r"Euro\s*/\s*Peso colombiano.{0,5000}?([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]+)?)",
-        r'class="P6K39c"[^>]*>([0-9.,]+)<',
+        r"EUR\s*/\s*COP.*?([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]+)?)",
+        r"Euro\s*/\s*Peso colombiano.*?([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]+)?)",
+        r"EUR\s*/\s*COP.*?([0-9]+(?:[.,][0-9]+)?)",
     ]
 
     valor_texto = None
     for patron in patrones:
-        match = re.search(patron, html, re.IGNORECASE | re.DOTALL)
+        match = re.search(patron, texto, re.IGNORECASE)
         if match:
             valor_texto = match.group(1)
             break
@@ -47,16 +48,13 @@ def obtener_tasa_eur_cop():
     if not valor_texto:
         raise ValueError("No se pudo localizar la tasa EUR/COP en Google Finance")
 
-    # Google en español muestra, por ejemplo, 3.647,4000.
     if "," in valor_texto and "." in valor_texto:
         valor_texto = valor_texto.replace(".", "").replace(",", ".")
     elif "," in valor_texto:
         valor_texto = valor_texto.replace(",", ".")
-    elif valor_texto.count(".") > 1:
-        valor_texto = valor_texto.replace(".", "")
 
     tasa = Decimal(valor_texto)
-    if tasa <= 0:
+    if tasa <= 0 or tasa > Decimal("100000"):
         raise ValueError("La tasa obtenida no es válida")
     return tasa
 
@@ -76,7 +74,6 @@ def parsear_cantidad(texto):
         partes = texto.split(".")
         if len(partes[-1]) == 3:
             texto = texto.replace(".", "")
-
     return Decimal(texto)
 
 
@@ -84,23 +81,15 @@ def convertir_moneda(mensaje):
     """Detecta EUR/COP y realiza la conversión en ambos sentidos."""
     texto = mensaje.lower().strip()
     texto = texto.replace("→", " a ").replace("->", " a ").replace("⇒", " a ")
-
-    # Normalizamos símbolos y nombres.
     texto = texto.replace("€", " eur ")
-    texto = re.sub(r"\beuros?\b", "eur", texto)
     texto = re.sub(r"\beuros?\b", "eur", texto)
     texto = re.sub(r"\bpesos?\s+colombianos?\b", "cop", texto)
     texto = re.sub(r"\bpeso\s+colombiano\b", "cop", texto)
     texto = re.sub(r"\bpesos?\b", "cop", texto)
 
     numero = r"([0-9][0-9.,]*)"
-    patron_eur = re.search(rf"{numero}\s*eur\b.*?\b(?:cop|peso colombiano)", texto)
+    patron_eur = re.search(rf"{numero}\s*eur\b.*?\bcop\b", texto)
     patron_cop = re.search(rf"{numero}\s*cop\b.*?\beur\b", texto)
-
-    # También acepta formatos como "100 EUR COP" o "500000 COP EUR".
-    if not patron_eur and not patron_cop:
-        patron_eur = re.search(rf"{numero}\s*eur\b.*?\bcop\b", texto)
-        patron_cop = re.search(rf"{numero}\s*cop\b.*?\beur\b", texto)
 
     if not patron_eur and not patron_cop:
         return None
@@ -116,25 +105,14 @@ def convertir_moneda(mensaje):
     try:
         tasa = obtener_tasa_eur_cop()
     except Exception:
-        return (
-            "No pude consultar la tasa actual de Google Finance en este momento. "
-            "Inténtalo de nuevo en unos segundos."
-        )
+        return "No pude consultar la tasa actual de Google Finance en este momento. Inténtalo de nuevo en unos segundos."
 
     if patron_eur:
         resultado = cantidad * tasa
-        return (
-            f"💱 {cantidad:,.2f} EUR = {resultado:,.0f} COP\n"
-            f"📊 Tasa: 1 EUR = {tasa:,.2f} COP\n"
-            "Fuente: Google Finance"
-        )
+        return f"💱 {cantidad:,.2f} EUR = {resultado:,.0f} COP\n📊 Tasa: 1 EUR = {tasa:,.2f} COP\nFuente: Google Finance"
 
     resultado = cantidad / tasa
-    return (
-        f"💱 {cantidad:,.0f} COP = {resultado:,.2f} EUR\n"
-        f"📊 Tasa: 1 EUR = {tasa:,.2f} COP\n"
-        "Fuente: Google Finance"
-    )
+    return f"💱 {cantidad:,.0f} COP = {resultado:,.2f} EUR\n📊 Tasa: 1 EUR = {tasa:,.2f} COP\nFuente: Google Finance"
 
 
 async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -150,7 +128,6 @@ async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if context.user_data.get("esperando_como_estas"):
         context.user_data["esperando_como_estas"] = False
-
         if mensaje in ("bien", "bien gracias", "muy bien", "genial", "perfecto"):
             await update.message.reply_text("¿En qué te puedo ayudar?")
         elif mensaje in ("mal", "muy mal", "triste", "regular"):
