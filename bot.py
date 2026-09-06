@@ -23,7 +23,7 @@ async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if mensaje == "hola":
         await update.message.reply_text("Hola, ¿cómo estás? 😜")
-    elif mensaje in ("bien", "gracias"):
+    elif mensaje == "bien":
         await update.message.reply_text("¿En qué te puedo ayudar?")
     elif mensaje == "mal":
         await update.message.reply_text("Vaya 😔, espero que mejore tu día.")
