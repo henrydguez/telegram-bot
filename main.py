@@ -26,21 +26,15 @@ def obtener_tasa_eur_cop():
     with urllib.request.urlopen(request, timeout=10) as response:
         html = response.read().decode("utf-8", errors="ignore")
 
-    # Quitamos etiquetas HTML para poder buscar el texto que Google muestra.
-    texto = re.sub(r"<script.*?</script>|<style.*?</style>", " ", html, flags=re.IGNORECASE | re.DOTALL)
-    texto = re.sub(r"<[^>]+>", " ", texto)
-    texto = re.sub(r"\s+", " ", texto)
-
-    # Google muestra actualmente algo como: EUR / COP ... Euro / Peso colombiano ... 3.647,4000
     patrones = [
-        r"EUR\s*/\s*COP.*?([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]+)?)",
-        r"Euro\s*/\s*Peso colombiano.*?([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]+)?)",
-        r"EUR\s*/\s*COP.*?([0-9]+(?:[.,][0-9]+)?)",
+        r"EUR\s*/\s*COP.{0,5000}?([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]+)?)",
+        r"Euro\s*/\s*Peso colombiano.{0,5000}?([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]+)?)",
+        r'class="P6K39c"[^>]*>([0-9.,]+)<',
     ]
 
     valor_texto = None
     for patron in patrones:
-        match = re.search(patron, texto, re.IGNORECASE)
+        match = re.search(patron, html, re.IGNORECASE | re.DOTALL)
         if match:
             valor_texto = match.group(1)
             break
@@ -52,9 +46,11 @@ def obtener_tasa_eur_cop():
         valor_texto = valor_texto.replace(".", "").replace(",", ".")
     elif "," in valor_texto:
         valor_texto = valor_texto.replace(",", ".")
+    elif valor_texto.count(".") > 1:
+        valor_texto = valor_texto.replace(".", "")
 
     tasa = Decimal(valor_texto)
-    if tasa <= 0 or tasa > Decimal("100000"):
+    if tasa <= 0:
         raise ValueError("La tasa obtenida no es válida")
     return tasa
 
@@ -74,6 +70,7 @@ def parsear_cantidad(texto):
         partes = texto.split(".")
         if len(partes[-1]) == 3:
             texto = texto.replace(".", "")
+
     return Decimal(texto)
 
 
@@ -105,14 +102,25 @@ def convertir_moneda(mensaje):
     try:
         tasa = obtener_tasa_eur_cop()
     except Exception:
-        return "No pude consultar la tasa actual de Google Finance en este momento. Inténtalo de nuevo en unos segundos."
+        return (
+            "No pude consultar la tasa actual de Google Finance en este momento. "
+            "Inténtalo de nuevo en unos segundos."
+        )
 
     if patron_eur:
         resultado = cantidad * tasa
-        return f"💱 {cantidad:,.2f} EUR = {resultado:,.0f} COP\n📊 Tasa: 1 EUR = {tasa:,.2f} COP\nFuente: Google Finance"
+        return (
+            f"💱 {cantidad:,.2f} EUR = {resultado:,.0f} COP\n"
+            f"📊 Tasa: 1 EUR = {tasa:,.2f} COP\n"
+            "Fuente: Google Finance"
+        )
 
     resultado = cantidad / tasa
-    return f"💱 {cantidad:,.0f} COP = {resultado:,.2f} EUR\n📊 Tasa: 1 EUR = {tasa:,.2f} COP\nFuente: Google Finance"
+    return (
+        f"💱 {cantidad:,.0f} COP = {resultado:,.2f} EUR\n"
+        f"📊 Tasa: 1 EUR = {tasa:,.2f} COP\n"
+        "Fuente: Google Finance"
+    )
 
 
 async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -121,32 +129,30 @@ async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     mensaje = update.message.text.strip().lower()
 
-    conversion = convertir_moneda(mensaje)
-    if conversion:
-        await update.message.reply_text(conversion)
-        return
-
-    if context.user_data.get("esperando_como_estas"):
-        context.user_data["esperando_como_estas"] = False
-        if mensaje in ("bien", "bien gracias", "muy bien", "genial", "perfecto"):
-            await update.message.reply_text("¿En qué te puedo ayudar?")
-        elif mensaje in ("mal", "muy mal", "triste", "regular"):
-            await update.message.reply_text("Vaya 😔, espero que mejore tu día.")
-        else:
-            await update.message.reply_text("Gracias por contármelo 😊 ¿En qué te puedo ayudar?")
-        return
-
+    # Respuestas conversacionales solicitadas.
     if mensaje == "hola":
-        context.user_data["esperando_como_estas"] = True
         await update.message.reply_text("Hola, ¿cómo estás? 😜")
+        return
+
+    if mensaje == "bien":
+        await update.message.reply_text("¿En qué te puedo ayudar?")
+        return
+
+    if mensaje == "mal":
+        await update.message.reply_text("Vaya 😔, espero que mejore tu día.")
         return
 
     if mensaje in ("buenos días", "buenos dias"):
         await update.message.reply_text("¡Buenos días! ☀️")
         return
 
-    if mensaje in ("gracias", "muchas gracias"):
+    if mensaje == "gracias":
         await update.message.reply_text("¡De nada! 😊")
+        return
+
+    conversion = convertir_moneda(mensaje)
+    if conversion:
+        await update.message.reply_text(conversion)
         return
 
 
