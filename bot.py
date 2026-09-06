@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -7,10 +8,24 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MINI_APP_URL = "https://henrydguez.github.io/telegram-bot/"
 
 if not TOKEN:
     raise RuntimeError("No se encontró BOT_TOKEN en el archivo .env")
+
+if not OPENAI_API_KEY:
+    raise RuntimeError("No se encontró OPENAI_API_KEY en el archivo .env")
+
+openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+
+SYSTEM_PROMPT = """
+Eres el asistente de un bot de Telegram.
+Responde siempre en español, de forma clara, natural y útil.
+Para preguntas sencillas, responde de forma breve.
+Si el usuario hace una pregunta más compleja, explica lo necesario sin complicar innecesariamente la respuesta.
+No inventes datos. Si no tienes suficiente información para responder con seguridad, dilo claramente.
+""".strip()
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -21,7 +36,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     ]]
     await update.message.reply_text(
-        "¡Hola! 👋 Soy tu bot de Telegram.\n\nPulsa el botón para abrir la Mini App:",
+        "¡Hola! 👋 Soy tu asistente de Telegram.\n\nPuedes preguntarme lo que quieras o abrir la Mini App:",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -43,18 +58,28 @@ async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    mensaje = update.message.text.strip().lower()
+    mensaje = update.message.text.strip()
 
-    if mensaje == "hola":
-        await update.message.reply_text("Hola, ¿cómo estás? 😜")
-    elif mensaje == "bien":
-        await update.message.reply_text("¿En qué te puedo ayudar?")
-    elif mensaje == "mal":
-        await update.message.reply_text("Vaya 😔, espero que mejore tu día.")
-    elif mensaje in ("buenos días", "buenos dias"):
-        await update.message.reply_text("¡Buenos días! ☀️")
-    elif mensaje == "gracias":
-        await update.message.reply_text("¡De nada! 😊")
+    try:
+        response = await openai_client.responses.create(
+            model="gpt-5.6",
+            instructions=SYSTEM_PROMPT,
+            input=mensaje,
+            max_output_tokens=500,
+        )
+
+        respuesta = response.output_text.strip()
+
+        if not respuesta:
+            respuesta = "No he podido generar una respuesta. Inténtalo de nuevo."
+
+        await update.message.reply_text(respuesta)
+
+    except Exception as error:
+        print(f"Error al consultar OpenAI: {error}")
+        await update.message.reply_text(
+            "Ahora mismo no puedo consultar la IA. Inténtalo de nuevo en unos segundos. 😕"
+        )
 
 
 app = Application.builder().token(TOKEN).build()
@@ -62,5 +87,5 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("app", abrir_app))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder_mensaje))
 
-print("Bot iniciado")
+print("Bot iniciado con IA")
 app.run_polling()
