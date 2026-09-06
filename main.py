@@ -19,7 +19,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def obtener_tasa_eur_cop():
-    """Obtiene la tasa EUR/COP mostrada por Google Finance."""
+    """Obtiene la cotización EUR/COP visible en Google Finance."""
     url = "https://www.google.com/finance/quote/EUR-COP?hl=es"
     request = urllib.request.Request(
         url,
@@ -29,59 +29,89 @@ def obtener_tasa_eur_cop():
     with urllib.request.urlopen(request, timeout=10) as response:
         html = response.read().decode("utf-8", errors="ignore")
 
-    # Google Finance suele incluir la cotización en un elemento con clase P6K39c.
-    match = re.search(r'class="P6K39c"[^>]*>([0-9.,]+)<', html)
-    if not match:
+    # Google Finance puede cambiar sus clases CSS. Buscamos la cotización
+    # alrededor del texto EUR / COP y también mantenemos un respaldo.
+    patrones = [
+        r"EUR\s*/\s*COP.{0,5000}?([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]+)?)",
+        r"Euro\s*/\s*Peso colombiano.{0,5000}?([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]+)?)",
+        r'class="P6K39c"[^>]*>([0-9.,]+)<',
+    ]
+
+    valor_texto = None
+    for patron in patrones:
+        match = re.search(patron, html, re.IGNORECASE | re.DOTALL)
+        if match:
+            valor_texto = match.group(1)
+            break
+
+    if not valor_texto:
         raise ValueError("No se pudo localizar la tasa EUR/COP en Google Finance")
 
-    valor = match.group(1).replace(",", "")
-    return Decimal(valor)
+    # Google en español muestra, por ejemplo, 3.647,4000.
+    if "," in valor_texto and "." in valor_texto:
+        valor_texto = valor_texto.replace(".", "").replace(",", ".")
+    elif "," in valor_texto:
+        valor_texto = valor_texto.replace(",", ".")
+    elif valor_texto.count(".") > 1:
+        valor_texto = valor_texto.replace(".", "")
+
+    tasa = Decimal(valor_texto)
+    if tasa <= 0:
+        raise ValueError("La tasa obtenida no es válida")
+    return tasa
+
+
+def parsear_cantidad(texto):
+    """Convierte cantidades españolas como 1000, 1.000 o 1.000,50 a Decimal."""
+    texto = texto.strip()
+    if "," in texto and "." in texto:
+        if texto.rfind(",") > texto.rfind("."):
+            texto = texto.replace(".", "").replace(",", ".")
+        else:
+            texto = texto.replace(",", "")
+    elif "," in texto:
+        partes = texto.split(",")
+        texto = texto.replace(",", ".") if len(partes[-1]) != 3 else texto.replace(",", "")
+    elif "." in texto:
+        partes = texto.split(".")
+        if len(partes[-1]) == 3:
+            texto = texto.replace(".", "")
+
+    return Decimal(texto)
 
 
 def convertir_moneda(mensaje):
-    """Detecta cantidades y convierte entre euros y pesos colombianos."""
-    texto = mensaje.lower().replace("€", " euros ").replace("$", " pesos ")
+    """Detecta EUR/COP y realiza la conversión en ambos sentidos."""
+    texto = mensaje.lower().strip()
+    texto = texto.replace("→", " a ").replace("->", " a ").replace("⇒", " a ")
 
-    patron_eur = re.search(
-        r"([0-9][0-9.,]*)\s*(?:euros?|eur)\b.*?(?:pesos?|cop)", texto
-    )
-    patron_cop = re.search(
-        r"([0-9][0-9.,]*)\s*(?:pesos?|cop)\b.*?(?:euros?|eur)", texto
-    )
+    # Normalizamos símbolos y nombres.
+    texto = texto.replace("€", " eur ")
+    texto = re.sub(r"\beuros?\b", "eur", texto)
+    texto = re.sub(r"\beuros?\b", "eur", texto)
+    texto = re.sub(r"\bpesos?\s+colombianos?\b", "cop", texto)
+    texto = re.sub(r"\bpeso\s+colombiano\b", "cop", texto)
+    texto = re.sub(r"\bpesos?\b", "cop", texto)
+
+    numero = r"([0-9][0-9.,]*)"
+    patron_eur = re.search(rf"{numero}\s*eur\b.*?\b(?:cop|peso colombiano)", texto)
+    patron_cop = re.search(rf"{numero}\s*cop\b.*?\beur\b", texto)
+
+    # También acepta formatos como "100 EUR COP" o "500000 COP EUR".
+    if not patron_eur and not patron_cop:
+        patron_eur = re.search(rf"{numero}\s*eur\b.*?\bcop\b", texto)
+        patron_cop = re.search(rf"{numero}\s*cop\b.*?\beur\b", texto)
 
     if not patron_eur and not patron_cop:
         return None
 
     match = patron_eur or patron_cop
-    cantidad_texto = match.group(1)
-
-    # Acepta formatos como 1000, 1.000, 1,000 y 1.000,50.
-    if "," in cantidad_texto and "." in cantidad_texto:
-        if cantidad_texto.rfind(",") > cantidad_texto.rfind("."):
-            cantidad_texto = cantidad_texto.replace(".", "").replace(",", ".")
-        else:
-            cantidad_texto = cantidad_texto.replace(",", "")
-    elif "," in cantidad_texto:
-        partes = cantidad_texto.split(",")
-        cantidad_texto = (
-            cantidad_texto.replace(",", "")
-            if len(partes[-1]) == 3
-            else cantidad_texto.replace(",", ".")
-        )
-    elif "." in cantidad_texto:
-        partes = cantidad_texto.split(".")
-        cantidad_texto = (
-            cantidad_texto.replace(".", "")
-            if len(partes[-1]) == 3
-            else cantidad_texto
-        )
-
     try:
-        cantidad = Decimal(cantidad_texto)
+        cantidad = parsear_cantidad(match.group(1))
         if cantidad <= 0:
             return "La cantidad debe ser mayor que cero."
-    except InvalidOperation:
-        return "No pude entender la cantidad. Prueba, por ejemplo: 100 euros a pesos."
+    except (InvalidOperation, ValueError):
+        return "No pude entender la cantidad. Prueba, por ejemplo: 100 euros a pesos colombianos."
 
     try:
         tasa = obtener_tasa_eur_cop()
