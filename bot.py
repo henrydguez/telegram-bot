@@ -1,5 +1,9 @@
+import html
 import logging
 import os
+import re
+from urllib.parse import quote_plus, urlparse
+from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
@@ -18,6 +22,8 @@ NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 MINI_APP_URL = "https://henrydguez.github.io/telegram-bot/"
 NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+WEB_SEARCH_ENABLED = os.getenv("WEB_SEARCH_ENABLED", "true").lower() == "true"
+WEB_SEARCH_MAX_RESULTS = int(os.getenv("WEB_SEARCH_MAX_RESULTS", "5"))
 
 if not TOKEN:
     raise RuntimeError("No se encontró BOT_TOKEN. Configúralo en el entorno del bot.")
@@ -38,8 +44,117 @@ Responde siempre en español, de forma natural, clara y útil.
 Cada mensaje del usuario debe ser procesado por el modelo; nunca uses respuestas predefinidas para preguntas normales.
 Para preguntas sencillas, responde de forma breve.
 Para preguntas complejas, explica lo necesario de manera comprensible.
-No inventes datos. Si no tienes suficiente información o no puedes verificar algo, dilo claramente.
+No inventes datos.
+Cuando recibas resultados de búsqueda web, úsalos para responder preguntas actuales y cita las fuentes con [1], [2], etc.
+No presentes una fuente como prueba de algo que no aparece en su contenido.
+Si las fuentes son contradictorias, indícalo y prioriza fuentes oficiales o de mayor autoridad.
+Si no tienes suficiente información o no puedes verificar algo, dilo claramente.
 """.strip()
+
+
+# Palabras/señales que indican que una respuesta puede necesitar información actualizada.
+WEB_TRIGGERS = (
+    "hoy", "ahora", "actual", "actualizado", "último", "última", "últimos", "últimas",
+    "noticias", "reciente", "recientes", "esta semana", "este mes", "2026", "precio",
+    "precios", "cotización", "cotiza", "tipo de cambio", "horario", "horarios", "abierto",
+    "abierta", "disponible", "disponibilidad", "evento", "eventos", "partido", "resultados",
+    "quién es el actual", "quien es el actual", "busca", "buscar", "investiga", "consulta en internet",
+    "en internet", "web", "fuentes", "según internet", "qué pasó", "que paso", "últimas noticias",
+)
+
+
+def necesita_busqueda_web(texto: str) -> bool:
+    texto_normalizado = " ".join(texto.lower().split())
+    return any(trigger in texto_normalizado for trigger in WEB_TRIGGERS)
+
+
+def limpiar_url(url: str) -> str:
+    """Elimina parámetros de tracking comunes y valida que sea http(s)."""
+    parsed = urlparse(html.unescape(url))
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}{parsed.path}" if parsed.path else f"{parsed.scheme}://{parsed.netloc}"
+
+
+def buscar_en_web(query: str, max_results: int = WEB_SEARCH_MAX_RESULTS) -> list[dict]:
+    """Búsqueda web ligera mediante DuckDuckGo HTML, sin guardar datos del usuario."""
+    url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
+    request = Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; TelegramAIBot/1.0; +https://telegram.org/)"
+        },
+    )
+
+    with urlopen(request, timeout=10) as response:
+        page = response.read().decode("utf-8", errors="replace")
+
+    results = []
+    pattern = re.compile(
+        r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    snippet_pattern = re.compile(
+        r'<(?:a|div)[^>]+class="result__snippet"[^>]*>(.*?)</(?:a|div)>',
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    links = pattern.findall(page)
+    snippets = snippet_pattern.findall(page)
+
+    for index, (raw_url, raw_title) in enumerate(links[:max_results]):
+        clean_url = limpiar_url(raw_url)
+        title = re.sub(r"<[^>]+>", " ", raw_title)
+        title = html.unescape(" ".join(title.split()))
+        snippet = ""
+        if index < len(snippets):
+            snippet = re.sub(r"<[^>]+>", " ", snippets[index])
+            snippet = html.unescape(" ".join(snippet.split()))
+
+        if clean_url and title:
+            results.append({"title": title, "url": clean_url, "snippet": snippet})
+
+    return results
+
+
+def formatear_resultados_web(resultados: list[dict]) -> str:
+    if not resultados:
+        return "No se encontraron resultados web relevantes."
+
+    partes = ["RESULTADOS DE BÚSQUEDA WEB:"]
+    for i, resultado in enumerate(resultados, start=1):
+        partes.append(
+            f"[{i}] {resultado['title']}\n"
+            f"URL: {resultado['url']}\n"
+            f"Resumen: {resultado['snippet']}"
+        )
+    return "\n\n".join(partes)
+
+
+async def llamar_modelo(mensaje: str, contexto_web: str | None = None) -> str:
+    user_content = mensaje
+    if contexto_web:
+        user_content = (
+            "Usa los siguientes resultados de búsqueda web como contexto para responder. "
+            "Cita las fuentes con [1], [2], etc. y no inventes información que no esté respaldada.\n\n"
+            f"{contexto_web}\n\nPREGUNTA DEL USUARIO:\n{mensaje}"
+        )
+
+    response = await ai_client.chat.completions.create(
+        model=NVIDIA_MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        max_tokens=1200,
+        temperature=0.5,
+        stream=False,
+    )
+
+    respuesta = (response.choices[0].message.content or "").strip()
+    if not respuesta:
+        raise RuntimeError("NVIDIA devolvió una respuesta vacía")
+    return respuesta
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -47,7 +162,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton("🚀 Abrir Mini App", web_app=WebAppInfo(url=MINI_APP_URL))
     ]]
     await update.message.reply_text(
-        "¡Hola! 👋 Soy tu asistente de IA con NVIDIA Nemotron.\n\nPuedes preguntarme lo que quieras o abrir la Mini App:",
+        "¡Hola! 👋 Soy tu asistente de IA con NVIDIA Nemotron.\n\n"
+        "Puedo responder preguntas normales y, cuando haga falta, consultar información actualizada en la web.\n\n"
+        "También puedes usar /buscar para forzar una búsqueda web.",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -61,8 +178,46 @@ async def abrir_app(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def modelo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        f"🤖 Motor activo: NVIDIA Nemotron\n🧠 Modelo: {NVIDIA_MODEL}\n🌐 API: NVIDIA NIM"
+        f"🤖 Motor activo: NVIDIA Nemotron\n"
+        f"🧠 Modelo: {NVIDIA_MODEL}\n"
+        f"🌐 API: NVIDIA NIM\n"
+        f"🔎 Búsqueda web: {'activa' if WEB_SEARCH_ENABLED else 'desactivada'}"
     )
+
+
+async def buscar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
+    query = " ".join(context.args).strip()
+    if not query:
+        await update.message.reply_text("Uso: /buscar qué ha pasado hoy con... ")
+        return
+
+    if not WEB_SEARCH_ENABLED:
+        await update.message.reply_text("🔎 La búsqueda web está desactivada en la configuración.")
+        return
+
+    try:
+        await update.message.reply_text("🔎 Buscando información actualizada...")
+        resultados = buscar_en_web(query)
+        contexto = formatear_resultados_web(resultados)
+        respuesta = await llamar_modelo(query, contexto)
+        await update.message.reply_text(respuesta)
+
+        if resultados:
+            fuentes = "\n\n🔗 Fuentes:\n" + "\n".join(
+                f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1)
+            )
+            # Telegram admite mensajes de hasta 4096 caracteres.
+            if len(fuentes) <= 3500:
+                await update.message.reply_text(fuentes)
+
+    except Exception:
+        logging.exception("Error durante la búsqueda web")
+        await update.message.reply_text(
+            "⚠️ No he podido realizar la búsqueda web en este momento. Inténtalo de nuevo."
+        )
 
 
 async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -74,27 +229,30 @@ async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        response = await ai_client.chat.completions.create(
-            model=NVIDIA_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": mensaje},
-            ],
-            max_tokens=1000,
-            temperature=0.7,
-            stream=False,
-        )
+        contexto_web = None
+        if WEB_SEARCH_ENABLED and necesita_busqueda_web(mensaje):
+            logging.info("Búsqueda web automática: %s", mensaje)
+            try:
+                resultados = buscar_en_web(mensaje)
+                contexto_web = formatear_resultados_web(resultados)
+            except Exception:
+                logging.exception("La búsqueda web automática falló; continúo solo con IA")
+                contexto_web = None
 
-        respuesta = (response.choices[0].message.content or "").strip()
-        if not respuesta:
-            raise RuntimeError("NVIDIA devolvió una respuesta vacía")
-
+        respuesta = await llamar_modelo(mensaje, contexto_web)
         await update.message.reply_text(respuesta)
+
+        if contexto_web and resultados:
+            fuentes = "🔗 Fuentes consultadas:\n" + "\n".join(
+                f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1)
+            )
+            if len(fuentes) <= 3500:
+                await update.message.reply_text(fuentes)
 
     except Exception:
         logging.exception("Error al consultar NVIDIA Nemotron")
         await update.message.reply_text(
-            "⚠️ No he podido consultar NVIDIA Nemotron en este momento. Revisa el registro de la terminal para ver el error exacto."
+            "⚠️ No he podido procesar tu mensaje en este momento. Revisa el registro de la terminal para ver el error exacto."
         )
 
 
@@ -106,11 +264,13 @@ app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("app", abrir_app))
 app.add_handler(CommandHandler("modelo", modelo))
+app.add_handler(CommandHandler("buscar", buscar))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder_mensaje))
 app.add_error_handler(error_handler)
 
 logging.info("============================================================")
 logging.info("BOT IA INICIADO | NVIDIA NEMOTRON | %s", NVIDIA_MODEL)
+logging.info("BÚSQUEDA WEB: %s", "ACTIVA" if WEB_SEARCH_ENABLED else "DESACTIVADA")
 logging.info("ENDPOINT: %s/chat/completions", NVIDIA_BASE_URL)
 logging.info("============================================================")
 app.run_polling(drop_pending_updates=True)
