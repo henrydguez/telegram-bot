@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import tempfile
+import asyncio
 from pathlib import Path
 from urllib.parse import quote_plus, urlparse
 from urllib.request import Request, urlopen
@@ -168,15 +169,18 @@ def transcribir_audio(audio_path: str) -> str:
     return texto
 
 
-async def llamar_modelo(mensaje: str, contexto_web: str | None = None) -> str:
-    user_content = mensaje
+async def preparar_mensaje_modelo(mensaje: str, contexto_web: str | None = None) -> str:
     if contexto_web:
-        user_content = (
+        return (
             "Usa los siguientes resultados de búsqueda web como contexto para responder. "
             "Cita las fuentes con [1], [2], etc. y no inventes información que no esté respaldada.\n\n"
             f"{contexto_web}\n\nPREGUNTA DEL USUARIO:\n{mensaje}"
         )
+    return mensaje
 
+
+async def llamar_modelo(mensaje: str, contexto_web: str | None = None) -> str:
+    user_content = await preparar_mensaje_modelo(mensaje, contexto_web)
     response = await ai_client.chat.completions.create(
         model=NVIDIA_MODEL,
         messages=[
@@ -194,6 +198,61 @@ async def llamar_modelo(mensaje: str, contexto_web: str | None = None) -> str:
     return respuesta
 
 
+async def llamar_modelo_stream(mensaje: str, contexto_web: str | None = None):
+    """Genera texto con Nemotron en streaming y entrega fragmentos progresivamente."""
+    user_content = await preparar_mensaje_modelo(mensaje, contexto_web)
+    stream = await ai_client.chat.completions.create(
+        model=NVIDIA_MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        max_tokens=1200,
+        temperature=0.5,
+        stream=True,
+    )
+
+    async for chunk in stream:
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+
+
+async def enviar_respuesta_stream(update: Update, mensaje: str, contexto_web: str | None = None):
+    """Muestra la respuesta en Telegram mientras Nemotron la genera."""
+    mensaje_telegram = await update.message.reply_text("🤖 Nemotron está escribiendo…")
+    respuesta = ""
+    ultima_edicion = 0.0
+
+    async for fragmento in llamar_modelo_stream(mensaje, contexto_web):
+        respuesta += fragmento
+        # Telegram limita la frecuencia de edición. Actualizamos cada ~0,8 s
+        # o cuando ya hay suficiente texto para que el cambio sea visible.
+        ahora = asyncio.get_running_loop().time()
+        if ahora - ultima_edicion >= 0.8 and respuesta.strip():
+            try:
+                await mensaje_telegram.edit_text(respuesta[:4096] + ("▌" if len(respuesta) < 4096 else ""))
+                ultima_edicion = ahora
+            except Exception as exc:
+                logging.warning("No se pudo actualizar el mensaje durante streaming: %s", exc)
+
+    respuesta = respuesta.strip()
+    if not respuesta:
+        raise RuntimeError("NVIDIA devolvió una respuesta vacía")
+
+    # Telegram permite 4096 caracteres por mensaje. Si la respuesta supera el límite,
+    # dejamos el primer tramo en el mensaje dinámico y continuamos en mensajes separados.
+    await mensaje_telegram.edit_text(respuesta[:4096])
+    restante = respuesta[4096:]
+    while restante:
+        await update.message.reply_text(restante[:4096])
+        restante = restante[4096:]
+
+    return respuesta
+
+
 async def enviar_consulta_ia(update: Update, mensaje: str):
     contexto_web = None
     resultados = []
@@ -206,8 +265,7 @@ async def enviar_consulta_ia(update: Update, mensaje: str):
         except Exception:
             logging.exception("La búsqueda web falló; continúo solo con IA")
 
-    respuesta = await llamar_modelo(mensaje, contexto_web)
-    await update.message.reply_text(respuesta)
+    await enviar_respuesta_stream(update, mensaje, contexto_web)
 
     if contexto_web and resultados:
         fuentes = "🔗 Fuentes consultadas:\n" + "\n".join(
@@ -244,7 +302,8 @@ async def modelo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔎 Búsqueda web: {'activa' if WEB_SEARCH_ENABLED else 'desactivada'}\n"
         f"🎙️ Voz: {'activa' if VOICE_ENABLED else 'desactivada'}\n"
         f"📝 Whisper: {WHISPER_MODEL}\n"
-        f"📱 Mini App: conectada"
+        f"📱 Mini App: conectada\n"
+        f"⚡ Streaming: activo"
     )
 
 
@@ -265,8 +324,7 @@ async def buscar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔎 Buscando información actualizada...")
         resultados = buscar_en_web(query)
         contexto = formatear_resultados_web(resultados)
-        respuesta = await llamar_modelo(query, contexto)
-        await update.message.reply_text(respuesta)
+        await enviar_respuesta_stream(update, query, contexto)
 
         if resultados:
             fuentes = "\n\n🔗 Fuentes:\n" + "\n".join(
@@ -371,6 +429,8 @@ logging.info("BOT IA INICIADO | NVIDIA NEMOTRON | %s", NVIDIA_MODEL)
 logging.info("BÚSQUEDA WEB: %s", "ACTIVA" if WEB_SEARCH_ENABLED else "DESACTIVADA")
 logging.info("VOZ: %s | WHISPER: %s", "ACTIVA" if VOICE_ENABLED else "DESACTIVADA", WHISPER_MODEL)
 logging.info("MINI APP: %s", MINI_APP_URL)
-logging.info("ENDPOINT: %s/chat/completions", NVIDIA_BASE_URL)
+logging.info("STREAMING: ACTIVO")
 logging.info("============================================================")
-app.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    app.run_polling(drop_pending_updates=True)
