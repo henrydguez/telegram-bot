@@ -2,52 +2,92 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Mini App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f14">
+  <title>Nemotron AI</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    :root { color-scheme: dark; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      text-align: center;
       margin: 0;
-      padding: 40px 20px;
-      background: var(--tg-theme-bg-color, #fff);
-      color: var(--tg-theme-text-color, #111);
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--tg-theme-bg-color, #0b0f14);
+      color: var(--tg-theme-text-color, #f5f7fa);
     }
-    .card {
-      max-width: 420px;
-      margin: 0 auto;
-      padding: 28px 20px;
-      border-radius: 20px;
-      background: var(--tg-theme-secondary-bg-color, #f1f1f1);
-    }
-    h1 { margin-top: 0; }
-    button {
-      border: 0;
-      border-radius: 12px;
-      padding: 14px 24px;
-      font-size: 16px;
-      cursor: pointer;
-      background: var(--tg-theme-button-color, #2481cc);
-      color: var(--tg-theme-button-text-color, #fff);
-    }
+    .wrap { max-width: 680px; margin: auto; padding: 20px 16px 32px; }
+    .hero { padding: 12px 4px 20px; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:999px; background:rgba(36,129,204,.16); color:var(--tg-theme-link-color,#55a7e8); font-size:12px; font-weight:700; }
+    h1 { margin:12px 0 6px; font-size:30px; }
+    .sub { margin:0; opacity:.72; line-height:1.45; }
+    .card { background:var(--tg-theme-secondary-bg-color,#151b23); border-radius:20px; padding:16px; margin-top:14px; }
+    textarea { width:100%; min-height:130px; resize:vertical; border:1px solid rgba(128,128,128,.25); border-radius:14px; padding:14px; background:var(--tg-theme-bg-color,#0b0f14); color:inherit; font:inherit; outline:none; }
+    textarea:focus { border-color:var(--tg-theme-button-color,#2481cc); }
+    .row { display:flex; gap:10px; margin-top:12px; }
+    button { flex:1; border:0; border-radius:13px; padding:13px 16px; font-size:15px; font-weight:700; cursor:pointer; background:var(--tg-theme-button-color,#2481cc); color:var(--tg-theme-button-text-color,#fff); }
+    button.secondary { background:rgba(128,128,128,.16); color:inherit; }
+    .hint { font-size:12px; opacity:.58; margin-top:10px; }
+    .features { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; }
+    .feature { padding:12px 8px; text-align:center; border-radius:14px; background:var(--tg-theme-secondary-bg-color,#151b23); font-size:12px; }
+    #status { min-height:18px; margin-top:12px; font-size:13px; opacity:.75; text-align:center; }
+    @media(max-width:430px){ .features{grid-template-columns:1fr;} .row{flex-direction:column;} }
   </style>
 </head>
 <body>
-  <main class="card">
-    <h1>🚀 Mi Mini App</h1>
-    <p id="mensaje">¡Bienvenido a tu Mini App de Telegram!</p>
-    <button id="saludar">👋 Saludar</button>
-  </main>
+  <div class="wrap">
+    <section class="hero">
+      <span class="badge">● CONECTADO A NEMOTRON</span>
+      <h1>🤖 Asistente IA</h1>
+      <p class="sub">Escribe tu pregunta y envíala directamente a tu bot de Telegram. También puedes pedir información actualizada de la web.</p>
+    </section>
+
+    <section class="card">
+      <textarea id="prompt" placeholder="Ej.: ¿Cuál es el precio del oro hoy?"></textarea>
+      <div class="row">
+        <button id="send">🚀 Enviar a la IA</button>
+        <button class="secondary" id="clear">Limpiar</button>
+      </div>
+      <div id="status"></div>
+      <div class="hint">La consulta se procesa mediante tu bot y NVIDIA Nemotron.</div>
+    </section>
+
+    <section class="features">
+      <div class="feature">🧠 NVIDIA Nemotron</div>
+      <div class="feature">🔎 Web actualizada</div>
+      <div class="feature">🎙️ Voz</div>
+    </section>
+  </div>
 
   <script>
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
-    document.getElementById('saludar').addEventListener('click', () => {
-      tg.showAlert('¡Hola desde la Mini App! 😎');
+    const prompt = document.getElementById('prompt');
+    const status = document.getElementById('status');
+
+    document.getElementById('send').addEventListener('click', () => {
+      const message = prompt.value.trim();
+      if (!message) {
+        tg.showAlert('Escribe una pregunta primero.');
+        return;
+      }
+      status.textContent = '📨 Enviando consulta al asistente…';
+      tg.sendData(JSON.stringify({ type: 'ask_ai', message }));
+      setTimeout(() => tg.close(), 250);
+    });
+
+    document.getElementById('clear').addEventListener('click', () => {
+      prompt.value = '';
+      prompt.focus();
+      status.textContent = '';
+    });
+
+    prompt.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        document.getElementById('send').click();
+      }
     });
   </script>
 </body>
