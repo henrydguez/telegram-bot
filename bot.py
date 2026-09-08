@@ -1,4 +1,5 @@
 import html
+import json
 import logging
 import os
 import re
@@ -193,6 +194,29 @@ async def llamar_modelo(mensaje: str, contexto_web: str | None = None) -> str:
     return respuesta
 
 
+async def enviar_consulta_ia(update: Update, mensaje: str):
+    contexto_web = None
+    resultados = []
+
+    if WEB_SEARCH_ENABLED and necesita_busqueda_web(mensaje):
+        logging.info("Búsqueda web automática: %s", mensaje)
+        try:
+            resultados = buscar_en_web(mensaje)
+            contexto_web = formatear_resultados_web(resultados)
+        except Exception:
+            logging.exception("La búsqueda web falló; continúo solo con IA")
+
+    respuesta = await llamar_modelo(mensaje, contexto_web)
+    await update.message.reply_text(respuesta)
+
+    if contexto_web and resultados:
+        fuentes = "🔗 Fuentes consultadas:\n" + "\n".join(
+            f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1)
+        )
+        if len(fuentes) <= 3500:
+            await update.message.reply_text(fuentes)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[
         InlineKeyboardButton("🚀 Abrir Mini App", web_app=WebAppInfo(url=MINI_APP_URL))
@@ -219,7 +243,8 @@ async def modelo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🌐 API: NVIDIA NIM\n"
         f"🔎 Búsqueda web: {'activa' if WEB_SEARCH_ENABLED else 'desactivada'}\n"
         f"🎙️ Voz: {'activa' if VOICE_ENABLED else 'desactivada'}\n"
-        f"📝 Whisper: {WHISPER_MODEL}"
+        f"📝 Whisper: {WHISPER_MODEL}\n"
+        f"📱 Mini App: conectada"
     )
 
 
@@ -278,31 +303,36 @@ async def procesar_voz(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ No he podido entender el audio. Inténtalo de nuevo, por favor.")
             return
 
-        contexto_web = None
-        resultados = []
-        if WEB_SEARCH_ENABLED and necesita_busqueda_web(texto):
-            logging.info("Búsqueda web automática desde voz: %s", texto)
-            try:
-                resultados = buscar_en_web(texto)
-                contexto_web = formatear_resultados_web(resultados)
-            except Exception:
-                logging.exception("La búsqueda web desde voz falló; continúo solo con IA")
-
-        respuesta = await llamar_modelo(texto, contexto_web)
-        await update.message.reply_text(respuesta)
-
-        if contexto_web and resultados:
-            fuentes = "🔗 Fuentes consultadas:\n" + "\n".join(
-                f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1)
-            )
-            if len(fuentes) <= 3500:
-                await update.message.reply_text(fuentes)
+        await enviar_consulta_ia(update, texto)
 
     except Exception:
         logging.exception("Error procesando mensaje de voz")
         await update.message.reply_text(
             "⚠️ No he podido procesar el mensaje de voz. Revisa el registro de la terminal para ver el error exacto."
         )
+
+
+async def procesar_mini_app(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.web_app_data:
+        return
+
+    try:
+        payload = json.loads(update.message.web_app_data.data)
+        if payload.get("type") != "ask_ai":
+            return
+
+        mensaje = str(payload.get("message", "")).strip()
+        if not mensaje:
+            await update.message.reply_text("⚠️ La Mini App no recibió ninguna pregunta.")
+            return
+
+        logging.info("Consulta desde Mini App | usuario=%s | mensaje=%s", update.effective_user.id if update.effective_user else "?", mensaje)
+        await update.message.reply_text("📱 Consulta recibida desde la Mini App. Estoy procesándola...")
+        await enviar_consulta_ia(update, mensaje)
+
+    except Exception:
+        logging.exception("Error procesando datos de la Mini App")
+        await update.message.reply_text("⚠️ No he podido procesar la consulta de la Mini App.")
 
 
 async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -314,26 +344,7 @@ async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        contexto_web = None
-        resultados = []
-        if WEB_SEARCH_ENABLED and necesita_busqueda_web(mensaje):
-            logging.info("Búsqueda web automática: %s", mensaje)
-            try:
-                resultados = buscar_en_web(mensaje)
-                contexto_web = formatear_resultados_web(resultados)
-            except Exception:
-                logging.exception("La búsqueda web automática falló; continúo solo con IA")
-
-        respuesta = await llamar_modelo(mensaje, contexto_web)
-        await update.message.reply_text(respuesta)
-
-        if contexto_web and resultados:
-            fuentes = "🔗 Fuentes consultadas:\n" + "\n".join(
-                f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1)
-            )
-            if len(fuentes) <= 3500:
-                await update.message.reply_text(fuentes)
-
+        await enviar_consulta_ia(update, mensaje)
     except Exception:
         logging.exception("Error al consultar NVIDIA Nemotron")
         await update.message.reply_text(
@@ -350,6 +361,7 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("app", abrir_app))
 app.add_handler(CommandHandler("modelo", modelo))
 app.add_handler(CommandHandler("buscar", buscar))
+app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, procesar_mini_app))
 app.add_handler(MessageHandler(filters.VOICE, procesar_voz))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder_mensaje))
 app.add_error_handler(error_handler)
@@ -358,6 +370,7 @@ logging.info("============================================================")
 logging.info("BOT IA INICIADO | NVIDIA NEMOTRON | %s", NVIDIA_MODEL)
 logging.info("BÚSQUEDA WEB: %s", "ACTIVA" if WEB_SEARCH_ENABLED else "DESACTIVADA")
 logging.info("VOZ: %s | WHISPER: %s", "ACTIVA" if VOICE_ENABLED else "DESACTIVADA", WHISPER_MODEL)
+logging.info("MINI APP: %s", MINI_APP_URL)
 logging.info("ENDPOINT: %s/chat/completions", NVIDIA_BASE_URL)
 logging.info("============================================================")
 app.run_polling(drop_pending_updates=True)
