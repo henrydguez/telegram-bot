@@ -1,94 +1,16 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0f14">
-  <title>Nemotron AI</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    * { box-sizing: border-box; }
-    :root { color-scheme: dark; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--tg-theme-bg-color, #0b0f14);
-      color: var(--tg-theme-text-color, #f5f7fa);
-    }
-    .wrap { max-width: 680px; margin: auto; padding: 20px 16px 32px; }
-    .hero { padding: 12px 4px 20px; }
-    .badge { display:inline-block; padding:6px 10px; border-radius:999px; background:rgba(36,129,204,.16); color:var(--tg-theme-link-color,#55a7e8); font-size:12px; font-weight:700; }
-    h1 { margin:12px 0 6px; font-size:30px; }
-    .sub { margin:0; opacity:.72; line-height:1.45; }
-    .card { background:var(--tg-theme-secondary-bg-color,#151b23); border-radius:20px; padding:16px; margin-top:14px; }
-    textarea { width:100%; min-height:130px; resize:vertical; border:1px solid rgba(128,128,128,.25); border-radius:14px; padding:14px; background:var(--tg-theme-bg-color,#0b0f14); color:inherit; font:inherit; outline:none; }
-    textarea:focus { border-color:var(--tg-theme-button-color,#2481cc); }
-    .row { display:flex; gap:10px; margin-top:12px; }
-    button { flex:1; border:0; border-radius:13px; padding:13px 16px; font-size:15px; font-weight:700; cursor:pointer; background:var(--tg-theme-button-color,#2481cc); color:var(--tg-theme-button-text-color,#fff); }
-    button.secondary { background:rgba(128,128,128,.16); color:inherit; }
-    .hint { font-size:12px; opacity:.58; margin-top:10px; }
-    .features { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; }
-    .feature { padding:12px 8px; text-align:center; border-radius:14px; background:var(--tg-theme-secondary-bg-color,#151b23); font-size:12px; }
-    #status { min-height:18px; margin-top:12px; font-size:13px; opacity:.75; text-align:center; }
-    @media(max-width:430px){ .features{grid-template-columns:1fr;} .row{flex-direction:column;} }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <section class="hero">
-      <span class="badge">● CONECTADO A NEMOTRON</span>
-      <h1>🤖 Asistente IA</h1>
-      <p class="sub">Escribe tu pregunta y envíala directamente a tu bot de Telegram. También puedes pedir información actualizada de la web.</p>
-    </section>
-
-    <section class="card">
-      <textarea id="prompt" placeholder="Ej.: ¿Cuál es el precio del oro hoy?"></textarea>
-      <div class="row">
-        <button id="send">🚀 Enviar a la IA</button>
-        <button class="secondary" id="clear">Limpiar</button>
-      </div>
-      <div id="status"></div>
-      <div class="hint">La consulta se procesa mediante tu bot y NVIDIA Nemotron.</div>
-    </section>
-
-    <section class="features">
-      <div class="feature">🧠 NVIDIA Nemotron</div>
-      <div class="feature">🔎 Web actualizada</div>
-      <div class="feature">🎙️ Voz</div>
-    </section>
-  </div>
-
-  <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
-
-    const prompt = document.getElementById('prompt');
-    const status = document.getElementById('status');
-
-    document.getElementById('send').addEventListener('click', () => {
-      const message = prompt.value.trim();
-      if (!message) {
-        tg.showAlert('Escribe una pregunta primero.');
-        return;
-      }
-      status.textContent = '📨 Enviando consulta al asistente…';
-      tg.sendData(JSON.stringify({ type: 'ask_ai', message }));
-      setTimeout(() => tg.close(), 250);
-    });
-
-    document.getElementById('clear').addEventListener('click', () => {
-      prompt.value = '';
-      prompt.focus();
-      status.textContent = '';
-    });
-
-    prompt.addEventListener('keydown', (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        document.getElementById('send').click();
-      }
-    });
-  </script>
-</body>
-</html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Asistente IA</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{color-scheme:light dark;--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--border:#e5e7eb;--user:#2563eb;--accent:#2563eb}*{box-sizing:border-box}body{margin:0;background:var(--tg-theme-bg-color,var(--bg));color:var(--tg-theme-text-color,var(--text));font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.app{max-width:760px;margin:auto;height:100vh;height:100dvh;display:flex;flex-direction:column}header{padding:14px 16px;border-bottom:1px solid var(--tg-theme-section-bg-color,var(--border));display:flex;align-items:center;gap:10px}.logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--accent);color:#fff;font-size:20px}.title{font-weight:750}.sub{font-size:12px;color:var(--tg-theme-hint-color,var(--muted))}.status{margin-left:auto;font-size:11px;color:#16a34a}#messages{flex:1;overflow:auto;padding:18px 14px 12px;display:flex;flex-direction:column;gap:12px}.row{display:flex}.row.user{justify-content:flex-end}.bubble{max-width:88%;padding:11px 13px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 1px 2px #0000000d}.user .bubble{background:var(--user);color:#fff;border-bottom-right-radius:5px}.assistant .bubble{background:var(--tg-theme-secondary-bg-color,var(--card));border:1px solid var(--tg-theme-section-bg-color,var(--border));border-bottom-left-radius:5px}.typing{display:inline-flex;gap:4px}.typing i{width:6px;height:6px;border-radius:50%;background:currentColor;animation:b 1s infinite}.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}@keyframes b{0%,60%,100%{opacity:.25}30%{opacity:1}}footer{padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--tg-theme-section-bg-color,var(--border))}.composer{display:flex;gap:8px;align-items:flex-end}.input{flex:1;resize:none;min-height:44px;max-height:140px;padding:12px;border:1px solid #cbd5e1;border-radius:15px;background:var(--tg-theme-secondary-bg-color,var(--card));color:inherit;outline:none}.input:focus{border-color:var(--accent)}button{border:0;border-radius:14px;min-width:46px;height:46px;background:var(--accent);color:#fff;font-size:18px}button:disabled{opacity:.45}.hint{text-align:center;font-size:11px;color:var(--tg-theme-hint-color,var(--muted));margin-top:6px}
+</style></head><body><div class="app"><header><div class="logo">🤖</div><div><div class="title">Asistente IA</div><div class="sub">NVIDIA Nemotron · Streaming</div></div><div class="status">● CONECTADO</div></header><main id="messages"></main><footer><div class="composer"><textarea id="input" class="input" rows="1" placeholder="Escribe tu pregunta…"></textarea><button id="send">➤</button></div><div class="hint">La respuesta aparece mientras Nemotron la genera</div></footer></div>
+<script>
+const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand()}
+const API_URL=window.API_URL||"";const messagesEl=document.getElementById('messages'),input=document.getElementById('input'),send=document.getElementById('send');let history=[],busy=false;
+function add(role,text='',typing=false){const row=document.createElement('div');row.className='row '+role;const b=document.createElement('div');b.className='bubble';if(typing)b.innerHTML='<span class="typing"><i></i><i></i><i></i></span>';else b.textContent=text;row.appendChild(b);messagesEl.appendChild(row);messagesEl.scrollTop=messagesEl.scrollHeight;return b}
+function welcome(){add('assistant','¡Hola! 👋 Soy tu asistente de IA.\n\nEscribe una pregunta y verás cómo Nemotron genera la respuesta en tiempo real.')}
+async function ask(){const text=input.value.trim();if(!text||busy)return;if(!API_URL){add('assistant','⚙️ El backend de streaming aún no está desplegado. La interfaz ya está preparada; configura API_URL con la URL HTTPS del backend.');return}busy=true;send.disabled=true;input.value='';input.style.height='44px';add('user',text);history.push({role:'user',content:text});const bubble=add('assistant','',true);let answer='';try{const res=await fetch(API_URL.replace(/\/$/,'')+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:tg?.initData||'',messages:history})});if(!res.ok)throw new Error(await res.text());const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split('\n\n');buffer=events.pop()||'';for(const event of events){const line=event.split('\n').find(x=>x.startsWith('data: '));if(!line)continue;const data=JSON.parse(line.slice(6));if(data.type==='delta'){answer+=data.content;bubble.textContent=answer;messagesEl.scrollTop=messagesEl.scrollHeight}if(data.type==='error')throw new Error(data.message)}}if(!answer)throw new Error('La IA devolvió una respuesta vacía');history.push({role:'assistant',content:answer})}catch(err){bubble.textContent='⚠️ No se pudo completar la consulta. '+(err.message||'Error de conexión.');history.pop()}finally{busy=false;send.disabled=false;input.focus()}}
+send.addEventListener('click',ask);input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask()}});input.addEventListener('input',()=>{input.style.height='44px';input.style.height=Math.min(input.scrollHeight,140)+'px'});welcome();
+</script></body></html>
