@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: telegram-nemotron
+    name: henrydguez-telegram-nemotron
     runtime: python
     plan: free
     branch: main
