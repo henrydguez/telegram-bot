@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: telegram-nemotron
+    runtime: python
+    plan: free
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: NVIDIA_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+      - key: NVIDIA_MODEL
+        value: nvidia/nemotron-3-super-120b-a12b
+      - key: TELEGRAM_INITDATA_MAX_AGE
+        value: "86400"
+      - key: WEB_SEARCH_ENABLED
+        value: "true"
+      - key: WEB_SEARCH_MAX_RESULTS
+        value: "5"
+      - key: VOICE_ENABLED
+        value: "true"
+      - key: WHISPER_MODEL
+        value: tiny
+      - key: WHISPER_DEVICE
+        value: cpu
+      - key: WHISPER_COMPUTE_TYPE
+        value: int8
+      - key: PYTHONUNBUFFERED
+        value: "1"
