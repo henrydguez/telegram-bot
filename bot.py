@@ -2,10 +2,13 @@ import html
 import logging
 import os
 import re
+import tempfile
+from pathlib import Path
 from urllib.parse import quote_plus, urlparse
 from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
+from faster_whisper import WhisperModel
 from openai import AsyncOpenAI
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
@@ -24,6 +27,10 @@ NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 WEB_SEARCH_ENABLED = os.getenv("WEB_SEARCH_ENABLED", "true").lower() == "true"
 WEB_SEARCH_MAX_RESULTS = int(os.getenv("WEB_SEARCH_MAX_RESULTS", "5"))
+VOICE_ENABLED = os.getenv("VOICE_ENABLED", "true").lower() == "true"
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
+WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
 
 if not TOKEN:
     raise RuntimeError("No se encontró BOT_TOKEN. Configúralo en el entorno del bot.")
@@ -38,6 +45,8 @@ ai_client = AsyncOpenAI(
     max_retries=2,
 )
 
+whisper_model = None
+
 SYSTEM_PROMPT = """
 Eres el asistente inteligente de un bot de Telegram conectado directamente a NVIDIA Nemotron.
 Responde siempre en español, de forma natural, clara y útil.
@@ -51,8 +60,6 @@ Si las fuentes son contradictorias, indícalo y prioriza fuentes oficiales o de 
 Si no tienes suficiente información o no puedes verificar algo, dilo claramente.
 """.strip()
 
-
-# Palabras/señales que indican que una respuesta puede necesitar información actualizada.
 WEB_TRIGGERS = (
     "hoy", "ahora", "actual", "actualizado", "último", "última", "últimos", "últimas",
     "noticias", "reciente", "recientes", "esta semana", "este mes", "2026", "precio",
@@ -69,7 +76,6 @@ def necesita_busqueda_web(texto: str) -> bool:
 
 
 def limpiar_url(url: str) -> str:
-    """Elimina parámetros de tracking comunes y valida que sea http(s)."""
     parsed = urlparse(html.unescape(url))
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return ""
@@ -77,7 +83,6 @@ def limpiar_url(url: str) -> str:
 
 
 def buscar_en_web(query: str, max_results: int = WEB_SEARCH_MAX_RESULTS) -> list[dict]:
-    """Búsqueda web ligera mediante DuckDuckGo HTML, sin guardar datos del usuario."""
     url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
     request = Request(
         url,
@@ -131,6 +136,37 @@ def formatear_resultados_web(resultados: list[dict]) -> str:
     return "\n\n".join(partes)
 
 
+def obtener_whisper_model():
+    global whisper_model
+    if whisper_model is None:
+        logging.info(
+            "Cargando Whisper | modelo=%s | device=%s | compute_type=%s",
+            WHISPER_MODEL,
+            WHISPER_DEVICE,
+            WHISPER_COMPUTE_TYPE,
+        )
+        whisper_model = WhisperModel(
+            WHISPER_MODEL,
+            device=WHISPER_DEVICE,
+            compute_type=WHISPER_COMPUTE_TYPE,
+        )
+        logging.info("Whisper listo")
+    return whisper_model
+
+
+def transcribir_audio(audio_path: str) -> str:
+    model = obtener_whisper_model()
+    segments, info = model.transcribe(
+        audio_path,
+        language="es",
+        beam_size=5,
+        vad_filter=True,
+    )
+    texto = " ".join(segment.text.strip() for segment in segments if segment.text.strip()).strip()
+    logging.info("Voz transcrita | idioma=%s | texto=%s", info.language, texto)
+    return texto
+
+
 async def llamar_modelo(mensaje: str, contexto_web: str | None = None) -> str:
     user_content = mensaje
     if contexto_web:
@@ -163,7 +199,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]]
     await update.message.reply_text(
         "¡Hola! 👋 Soy tu asistente de IA con NVIDIA Nemotron.\n\n"
-        "Puedo responder preguntas normales y, cuando haga falta, consultar información actualizada en la web.\n\n"
+        "Puedo responder preguntas normales, consultar información actualizada en la web y entender mensajes de voz.\n\n"
         "También puedes usar /buscar para forzar una búsqueda web.",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
@@ -181,7 +217,9 @@ async def modelo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🤖 Motor activo: NVIDIA Nemotron\n"
         f"🧠 Modelo: {NVIDIA_MODEL}\n"
         f"🌐 API: NVIDIA NIM\n"
-        f"🔎 Búsqueda web: {'activa' if WEB_SEARCH_ENABLED else 'desactivada'}"
+        f"🔎 Búsqueda web: {'activa' if WEB_SEARCH_ENABLED else 'desactivada'}\n"
+        f"🎙️ Voz: {'activa' if VOICE_ENABLED else 'desactivada'}\n"
+        f"📝 Whisper: {WHISPER_MODEL}"
     )
 
 
@@ -209,7 +247,6 @@ async def buscar(update: Update, context: ContextTypes.DEFAULT_TYPE):
             fuentes = "\n\n🔗 Fuentes:\n" + "\n".join(
                 f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1)
             )
-            # Telegram admite mensajes de hasta 4096 caracteres.
             if len(fuentes) <= 3500:
                 await update.message.reply_text(fuentes)
 
@@ -217,6 +254,54 @@ async def buscar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.exception("Error durante la búsqueda web")
         await update.message.reply_text(
             "⚠️ No he podido realizar la búsqueda web en este momento. Inténtalo de nuevo."
+        )
+
+
+async def procesar_voz(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.voice:
+        return
+
+    if not VOICE_ENABLED:
+        await update.message.reply_text("🎙️ La función de voz está desactivada.")
+        return
+
+    try:
+        await update.message.reply_text("🎙️ Entendido. Estoy transcribiendo tu mensaje...")
+
+        telegram_file = await context.bot.get_file(update.message.voice.file_id)
+        with tempfile.TemporaryDirectory(prefix="telegram_voice_") as temp_dir:
+            audio_path = Path(temp_dir) / "mensaje.ogg"
+            await telegram_file.download_to_drive(custom_path=str(audio_path))
+            texto = transcribir_audio(str(audio_path))
+
+        if not texto:
+            await update.message.reply_text("⚠️ No he podido entender el audio. Inténtalo de nuevo, por favor.")
+            return
+
+        contexto_web = None
+        resultados = []
+        if WEB_SEARCH_ENABLED and necesita_busqueda_web(texto):
+            logging.info("Búsqueda web automática desde voz: %s", texto)
+            try:
+                resultados = buscar_en_web(texto)
+                contexto_web = formatear_resultados_web(resultados)
+            except Exception:
+                logging.exception("La búsqueda web desde voz falló; continúo solo con IA")
+
+        respuesta = await llamar_modelo(texto, contexto_web)
+        await update.message.reply_text(respuesta)
+
+        if contexto_web and resultados:
+            fuentes = "🔗 Fuentes consultadas:\n" + "\n".join(
+                f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1)
+            )
+            if len(fuentes) <= 3500:
+                await update.message.reply_text(fuentes)
+
+    except Exception:
+        logging.exception("Error procesando mensaje de voz")
+        await update.message.reply_text(
+            "⚠️ No he podido procesar el mensaje de voz. Revisa el registro de la terminal para ver el error exacto."
         )
 
 
@@ -230,6 +315,7 @@ async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         contexto_web = None
+        resultados = []
         if WEB_SEARCH_ENABLED and necesita_busqueda_web(mensaje):
             logging.info("Búsqueda web automática: %s", mensaje)
             try:
@@ -237,7 +323,6 @@ async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 contexto_web = formatear_resultados_web(resultados)
             except Exception:
                 logging.exception("La búsqueda web automática falló; continúo solo con IA")
-                contexto_web = None
 
         respuesta = await llamar_modelo(mensaje, contexto_web)
         await update.message.reply_text(respuesta)
@@ -265,12 +350,14 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("app", abrir_app))
 app.add_handler(CommandHandler("modelo", modelo))
 app.add_handler(CommandHandler("buscar", buscar))
+app.add_handler(MessageHandler(filters.VOICE, procesar_voz))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder_mensaje))
 app.add_error_handler(error_handler)
 
 logging.info("============================================================")
 logging.info("BOT IA INICIADO | NVIDIA NEMOTRON | %s", NVIDIA_MODEL)
 logging.info("BÚSQUEDA WEB: %s", "ACTIVA" if WEB_SEARCH_ENABLED else "DESACTIVADA")
+logging.info("VOZ: %s | WHISPER: %s", "ACTIVA" if VOICE_ENABLED else "DESACTIVADA", WHISPER_MODEL)
 logging.info("ENDPOINT: %s/chat/completions", NVIDIA_BASE_URL)
 logging.info("============================================================")
 app.run_polling(drop_pending_updates=True)
