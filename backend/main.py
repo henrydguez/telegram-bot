@@ -5,23 +5,20 @@ import os
 import time
 from urllib.parse import parse_qsl
 
-from fastapi import FastAPI, HTTPException, Request
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
-from telegram import Update
 
-# Importamos el bot existente para reutilizar comandos, búsqueda web, voz y streaming.
-import bot as telegram_bot
+load_dotenv()
 
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 TELEGRAM_INITDATA_MAX_AGE = int(os.getenv("TELEGRAM_INITDATA_MAX_AGE", "86400"))
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
-WEBHOOK_PATH = "/telegram/webhook"
 
 if not NVIDIA_API_KEY:
     raise RuntimeError("NVIDIA_API_KEY is required")
@@ -36,7 +33,7 @@ Mantén el contexto de la conversación.
 No inventes datos. Si no sabes algo, dilo claramente.
 Para preguntas sencillas, responde brevemente; para preguntas complejas, explica lo necesario."""
 
-app = FastAPI(title="Telegram Nemotron 24/7 API", version="2.0.0")
+app = FastAPI(title="Telegram Nemotron Local API", version="3.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://henrydguez.github.io"],
@@ -57,7 +54,6 @@ class ChatRequest(BaseModel):
 
 
 def validate_telegram_init_data(init_data: str) -> dict:
-    # parse_qsl hace la decodificación de URL una sola vez.
     pairs = parse_qsl(init_data, keep_blank_values=True)
     data = dict(pairs)
     received_hash = data.pop("hash", None)
@@ -67,7 +63,7 @@ def validate_telegram_init_data(init_data: str) -> dict:
     auth_date = data.get("auth_date")
     try:
         age = time.time() - int(auth_date) if auth_date else float("inf")
-    except ValueError:
+    except (TypeError, ValueError):
         raise HTTPException(status_code=401, detail="Invalid Telegram auth_date")
 
     if age < -300 or age > TELEGRAM_INITDATA_MAX_AGE:
@@ -105,68 +101,20 @@ async def stream_nemotron(messages: list[dict]):
             temperature=0.5,
             stream=True,
         )
-
         async for chunk in response:
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta.content
             if delta:
                 yield f"data: {json.dumps({'type': 'delta', 'content': delta}, ensure_ascii=False)}\n\n"
-
         yield "data: {\"type\":\"done\"}\n\n"
     except Exception as exc:
         yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
 
 
-@app.on_event("startup")
-async def startup():
-    await telegram_bot.app.initialize()
-    await telegram_bot.app.start()
-
-    if RENDER_EXTERNAL_URL:
-        webhook_url = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}"
-        await telegram_bot.app.bot.set_webhook(
-            url=webhook_url,
-            drop_pending_updates=True,
-            allowed_updates=Update.ALL_TYPES,
-        )
-        telegram_bot.logging.info("Telegram webhook configurado: %s", webhook_url)
-    else:
-        telegram_bot.logging.info("RENDER_EXTERNAL_URL no definido; webhook no configurado")
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    try:
-        if RENDER_EXTERNAL_URL:
-            await telegram_bot.app.bot.delete_webhook(drop_pending_updates=False)
-        await telegram_bot.app.stop()
-        await telegram_bot.app.shutdown()
-    except Exception:
-        telegram_bot.logging.exception("Error cerrando el bot")
-
-
 @app.get("/health")
 async def health():
-    webhook = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}" if RENDER_EXTERNAL_URL else None
-    return {
-        "status": "ok",
-        "model": NVIDIA_MODEL,
-        "streaming": True,
-        "telegram_webhook": webhook,
-    }
-
-
-@app.post(WEBHOOK_PATH)
-async def telegram_webhook(request: Request):
-    try:
-        payload = await request.json()
-        update = Update.de_json(payload, telegram_bot.app.bot)
-        await telegram_bot.app.process_update(update)
-        return {"ok": True}
-    except Exception:
-        telegram_bot.logging.exception("Error procesando webhook de Telegram")
-        raise HTTPException(status_code=500, detail="Telegram update processing failed")
+    return {"status": "ok", "model": NVIDIA_MODEL, "streaming": True, "telegram_polling": True}
 
 
 @app.post("/chat")
