@@ -19,7 +19,7 @@ function toast(message){const el=$('toast');if(!el)return;el.textContent=message
 function saveMovement(){const amount=Number(digits[activeType]||0)/100,category=$('activeCategory').value,date=$('activeDate').value,description=$('activeDescription').value.trim();if(amount<=0)return toast(`Introduce un importe de ${activeType==='income'?'ingreso':'gasto'}`);if(!date)return toast('Selecciona una fecha');if(!category)return toast('Selecciona una categoría');totals[activeType]+=amount;movements.push({type:activeType,amount,date,category,description});localStorage.setItem('financial_totals_v1',JSON.stringify(totals));localStorage.setItem('financial_movements_v1',JSON.stringify(movements));resetActive();toast(activeType==='income'?'Ingreso guardado':'Gasto guardado');updateReports();renderMovements()}
 function renderCategories(){const select=$('activeCategory');if(!select)return;select.innerHTML='<option value="">Selecciona una categoría</option>'+categories[activeType].map(c=>`<option>${c}</option>`).join('')}
 function switchType(type){activeType=type;const income=$('incomeTab'),expense=$('expenseTab');income.classList.toggle('active',type==='income');expense.classList.toggle('active',type==='expense');income.setAttribute('aria-selected',type==='income');expense.setAttribute('aria-selected',type==='expense');$('saveActive').textContent=type==='income'?'Guardar ingreso':'Guardar gasto';renderCategories();renderAmount();$('activeDate').value=today();$('activeCategory').value='';$('activeDescription').value=''}
-function applyTheme(mode){const dark=mode==='dark';document.body.classList.toggle('theme-light',!dark);document.body.classList.toggle('theme-dark',dark);const button=$('themeToggle'),icon=$('themeIcon');if(button&&icon){icon.textContent=dark?'☀':'☾';button.setAttribute('aria-label',dark?'Cambiar a modo día':'Cambiar a modo noche');button.title=dark?'Modo día':'Modo noche'}localStorage.setItem('theme_mode_v1',dark?'dark':'light')}
+function applyTheme(mode){const dark=mode==='dark',html=document.documentElement;html.classList.toggle('theme-light',!dark);html.classList.toggle('theme-dark',dark);document.body.classList.toggle('theme-light',!dark);document.body.classList.toggle('theme-dark',dark);const button=$('themeToggle'),icon=$('themeIcon');if(button&&icon){icon.textContent=dark?'☀':'☾';button.setAttribute('aria-label',dark?'Cambiar a modo día':'Cambiar a modo noche');button.title=dark?'Modo día':'Modo noche'}localStorage.setItem('theme_mode_v1',dark?'dark':'light')}
 
 $('registerButton')?.addEventListener('click',()=>show('register'));
 $('reportsButton')?.addEventListener('click',()=>{updateReports();show('reports')});
@@ -31,7 +31,7 @@ $('movementsBack')?.addEventListener('click',()=>show('reports'));
 $('saveActive')?.addEventListener('click',saveMovement);
 $('incomeTab')?.addEventListener('click',()=>switchType('income'));
 $('expenseTab')?.addEventListener('click',()=>switchType('expense'));
-$('themeToggle')?.addEventListener('click',()=>applyTheme(document.body.classList.contains('theme-dark')?'light':'dark'));
+$('themeToggle')?.addEventListener('click',()=>applyTheme(document.documentElement.classList.contains('theme-dark')?'light':'dark'));
 
 const input=$('activeAmount');
 input?.addEventListener('focus',()=>input.select());
@@ -40,7 +40,7 @@ $('activeDate').value=today();
 $('sharedKeypad')?.querySelectorAll('[data-key]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.key;if(k==='clear')digits[activeType]='';else if(k==='backspace')digits[activeType]=digits[activeType].slice(0,-1);else if(digits[activeType].length<10)digits[activeType]+=k;renderAmount()}));
 
 const savedTheme=localStorage.getItem('theme_mode_v1');
-const initialTheme=savedTheme||(window.matchMedia?.('(prefers-color-scheme: dark)').matches?'dark':'light');
+const initialTheme=savedTheme==='dark'||savedTheme==='light'?savedTheme:'light';
 applyTheme(initialTheme);
 renderCategories();
 show('home');
