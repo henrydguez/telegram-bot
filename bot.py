@@ -1,5 +1,4 @@
 import html
-import json
 import logging
 import os
 import re
@@ -21,7 +20,6 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 TOKEN = os.getenv("BOT_TOKEN")
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
-MINI_APP_URL = "https://henrydguez.github.io/telegram-bot/"
 NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 WEB_SEARCH_ENABLED = os.getenv("WEB_SEARCH_ENABLED", "true").lower() == "true"
@@ -166,15 +164,11 @@ async def enviar_consulta_ia(update: Update, mensaje: str):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("¡Hola! 👋 Soy tu asistente de IA con NVIDIA Nemotron.\n\nPuedo responder preguntas normales, consultar información actualizada en la web y entender mensajes de voz.\n\nLa Mini App se abre desde el botón inferior del chat.\n\nTambién puedes usar /buscar para forzar una búsqueda web.")
-
-
-async def abrir_app(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📱 La Mini App se abre desde el botón inferior del chat de Telegram.")
+    await update.message.reply_text("¡Hola! 👋 Soy tu asistente de IA con NVIDIA Nemotron.\n\nPuedo responder preguntas normales, consultar información actualizada en la web y entender mensajes de voz.\n\nTambién puedes usar /buscar para forzar una búsqueda web.")
 
 
 async def modelo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"🤖 Motor activo: NVIDIA Nemotron\n🧠 Modelo: {NVIDIA_MODEL}\n🌐 API: NVIDIA NIM\n🔎 Búsqueda web: {'activa' if WEB_SEARCH_ENABLED else 'desactivada'}\n🎙️ Voz: {'activa' if VOICE_ENABLED else 'desactivada'}\n📝 Whisper: {WHISPER_MODEL}\n📱 Mini App: conectada\n⚡ Streaming: activo")
+    await update.message.reply_text(f"🤖 Motor activo: NVIDIA Nemotron\n🧠 Modelo: {NVIDIA_MODEL}\n🌐 API: NVIDIA NIM\n🔎 Búsqueda web: {'activa' if WEB_SEARCH_ENABLED else 'desactivada'}\n🎙️ Voz: {'activa' if VOICE_ENABLED else 'desactivada'}\n📝 Whisper: {WHISPER_MODEL}\n⚡ Streaming: activo")
 
 
 async def buscar(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -222,25 +216,6 @@ async def procesar_voz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ No he podido procesar el mensaje de voz. Revisa el registro de la terminal para ver el error exacto.")
 
 
-async def procesar_mini_app(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.web_app_data:
-        return
-    try:
-        payload = json.loads(update.message.web_app_data.data)
-        if payload.get("type") != "ask_ai":
-            return
-        mensaje = str(payload.get("message", "")).strip()
-        if not mensaje:
-            await update.message.reply_text("⚠️ La Mini App no recibió ninguna pregunta.")
-            return
-        logging.info("Consulta desde Mini App | usuario=%s | mensaje=%s", update.effective_user.id if update.effective_user else "?", mensaje)
-        await update.message.reply_text("📱 Consulta recibida desde la Mini App. Estoy procesándola...")
-        await enviar_consulta_ia(update, mensaje)
-    except Exception:
-        logging.exception("Error procesando datos de la Mini App")
-        await update.message.reply_text("⚠️ No he podido procesar la consulta de la Mini App.")
-
-
 async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -260,10 +235,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("app", abrir_app))
 app.add_handler(CommandHandler("modelo", modelo))
 app.add_handler(CommandHandler("buscar", buscar))
-app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, procesar_mini_app))
 app.add_handler(MessageHandler(filters.VOICE, procesar_voz))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder_mensaje))
 app.add_error_handler(error_handler)
@@ -272,7 +245,6 @@ logging.info("============================================================")
 logging.info("BOT IA INICIADO | NVIDIA NEMOTRON | %s", NVIDIA_MODEL)
 logging.info("BÚSQUEDA WEB: %s", "ACTIVA" if WEB_SEARCH_ENABLED else "DESACTIVADA")
 logging.info("VOZ: %s | WHISPER: %s", "ACTIVA" if VOICE_ENABLED else "DESACTIVADA", WHISPER_MODEL)
-logging.info("MINI APP: %s", MINI_APP_URL)
 logging.info("STREAMING: ACTIVO")
 logging.info("============================================================")
 
