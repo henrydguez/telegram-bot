@@ -1,0 +1,29 @@
+name: Configure Telegram Mini App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/configure-telegram-mini-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configure-menu-button:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Set Telegram menu button
+        shell: bash
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          MINI_APP_URL: https://henrydguez.github.io/telegram-bot/
+        run: |
+          set -euo pipefail
+          test -n "$BOT_TOKEN"
+          response="$(curl -fsS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setChatMenuButton" \
+            -H 'Content-Type: application/json' \
+            --data "$(python -c 'import json,os; print(json.dumps({"menu_button":{"type":"web_app","text":"Control financiero","web_app":{"url":os.environ["MINI_APP_URL"]}}}))')")"
+          echo "$response" | python -c 'import json,sys; data=json.load(sys.stdin); assert data.get("ok") is True, data; print("Telegram menu button configurado correctamente.")'
