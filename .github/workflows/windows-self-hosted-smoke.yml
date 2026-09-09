@@ -13,7 +13,7 @@ jobs:
   smoke-test:
     name: Validate Windows runner
     runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -29,6 +29,13 @@ jobs:
           ver
           if /I not "%RUNNER_OS%"=="Windows" exit /b 1
           if /I not "%RUNNER_ARCH%"=="X64" exit /b 1
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: x64
+          cache: "pip"
 
       - name: Check Git and Python
         shell: cmd
