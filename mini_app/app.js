@@ -5,7 +5,7 @@ if (tg) {
   tg.ready();
   tg.expand();
   tg.setHeaderColor('#0b3d91');
-  tg.setBackgroundColor('#f5f8fd');
+  tg.setBackgroundColor('#ffffff');
 }
 
 const menu = document.getElementById('menu');
@@ -23,7 +23,6 @@ const getMovements = () => {
 };
 
 const saveMovements = (movements) => localStorage.setItem(STORAGE_KEY, JSON.stringify(movements));
-
 const formatMoney = (value) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(value);
 const formatDate = (value) => {
   if (!value) return '';
@@ -74,14 +73,16 @@ const renderForm = (type) => {
   const isIncome = type === 'income';
   const categories = isIncome ? ['Nómina', 'Freelance', 'Ventas', 'Inversiones', 'Otros'] : ['Vivienda', 'Alimentación', 'Transporte', 'Salud', 'Ocio', 'Compras', 'Servicios', 'Otros'];
   menu.innerHTML = `<button class="back-button" id="back-movements" type="button"><span>‹</span> Atrás</button>
-    <section class="form-card"><div class="form-heading"><div class="form-icon ${type}">${isIncome ? '+' : '−'}</div><div><p class="eyebrow-dark">NUEVO MOVIMIENTO</p><h2>${isIncome ? 'Registrar ingreso' : 'Registrar gasto'}</h2></div></div>
+    <section class="form-card ${type}-form">
+      <div class="form-heading"><div class="form-icon ${type}">${isIncome ? '+' : '−'}</div><div><p class="eyebrow-dark">NUEVO MOVIMIENTO</p><h2>${isIncome ? 'Registrar ingreso' : 'Registrar gasto'}</h2></div></div>
       <form id="movement-form">
-        <label>Importe <span>€</span><input id="amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00" required></label>
+        <label>Importe <span>€</span><input id="amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00" required autofocus></label>
         <label>Fecha <input id="date" name="date" type="date" required></label>
         <label>Categoría<select id="category" name="category" required><option value="" selected disabled>Selecciona una categoría</option>${categories.map((category) => `<option value="${category}">${category}</option>`).join('')}</select></label>
         <label>Descripción <span>opcional</span><textarea id="description" name="description" rows="3" maxlength="160" placeholder="Añade una descripción"></textarea></label>
         <button class="primary-button ${type}" type="submit">Guardar movimiento</button>
-      </form></section>`;
+      </form>
+    </section>`;
 
   document.getElementById('date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('back-movements').addEventListener('click', renderMovementMenu);
