@@ -13,7 +13,7 @@ permissions:
   pages: write
   id-token: write
 
-# Only one Pages deployment may run at a time. A newer change always wins.
+# One shared Pages deployment: the newest change always wins.
 concurrency:
   group: financial-mini-app-pages
   cancel-in-progress: true
@@ -22,8 +22,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: github-pages
 
     steps:
       - name: Checkout production
@@ -47,12 +45,8 @@ jobs:
           test -f production/mini_app/index.html
           test -f development/mini_app/index.html
           test -f development/mini_app/dev-config.js
-
-          # DEV must contain the DEV marker and the current Registro label.
           grep -q 'Control Financiero · DEV' development/mini_app/index.html
           grep -q '<strong>Registro</strong>' development/mini_app/index.html
-
-          # Production must not accidentally receive the DEV-only marker.
           if grep -q 'Control Financiero · DEV' production/mini_app/index.html; then
             echo 'ERROR: production contains the DEV marker.'
             exit 1
@@ -64,24 +58,16 @@ jobs:
           set -euo pipefail
           rm -rf site
           mkdir -p site/dev
-
-          # Root is always production; /dev/ is always the develop branch.
           cp -R production/mini_app/. site/
           cp -R development/mini_app/. site/dev/
-
-          # Publish an explicit build manifest so the deployed version can be audited.
           printf '{\n  "production_commit": "%s",\n  "develop_commit": "%s",\n  "develop_path": "/dev/"\n}\n' \
             "$(git -C production rev-parse HEAD)" \
             "$(git -C development rev-parse HEAD)" > site/deployment-info.json
-
           test -f site/index.html
           test -f site/dev/index.html
           grep -q '<strong>Registro</strong>' site/dev/index.html
-
-          echo '=== Pages deployment ==='
           echo "production: $(git -C production rev-parse HEAD) -> /"
           echo "develop:    $(git -C development rev-parse HEAD) -> /dev/"
-          echo '=== Published files ==='
           find site -maxdepth 2 -type f | sort
 
       - name: Configure Pages
@@ -95,4 +81,5 @@ jobs:
           path: site
 
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
