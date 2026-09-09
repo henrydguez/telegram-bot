@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#0b3d91"><title>Control Financiero</title><script>try{var t=localStorage.getItem('theme_mode_v1');document.documentElement.classList.add(t==='dark'?'theme-dark':'theme-light')}catch(e){document.documentElement.classList.add('theme-light')}</script><link rel="stylesheet" href="style.css?v=13"><script src="https://telegram.org/js/telegram-web-app.js"></script>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#0b3d91"><title>Control Financiero</title><script>try{var t=localStorage.getItem('theme_mode_v1');document.documentElement.classList.add(t==='dark'?'theme-dark':'theme-light')}catch(e){document.documentElement.classList.add('theme-light')}</script><link rel="stylesheet" href="style.css?v=14"><script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body><main class="app">
 <header class="hero"><div class="hero-top"><p class="eyebrow">CONTROL FINANCIERO</p><button id="themeToggle" class="theme-toggle" type="button" aria-label="Cambiar a modo noche" title="Modo noche"><span id="themeIcon" aria-hidden="true">☾</span></button></div><h1>Mis finanzas</h1><p class="subtitle">Gestiona tus ingresos y gastos.</p></header>
@@ -15,7 +15,7 @@
   <div class="inline-form">
     <div class="amount-box"><span class="currency">€</span><input id="activeAmount" type="text" inputmode="decimal" placeholder="0,00" aria-label="Importe"></div>
     <div class="keypad" id="sharedKeypad" aria-label="Teclado numérico"><button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button><button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button><button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button><button data-key="clear">C</button><button data-key="0">0</button><button data-key="backspace">⌫</button></div>
-    <div class="secondary-fields"><label class="field">Fecha<input id="activeDate" type="date"></label><label class="field">Categoría<select id="activeCategory"><option value="">Selecciona una categoría</option></select></label><label class="field description-field">Descripción<textarea id="activeDescription" rows="2" maxlength="160" placeholder="Opcional"></textarea></label></div>
+    <div class="secondary-fields"><label class="field">Fecha<input id="activeDate" type="date"></label><label class="field">Categoría<select id="activeCategory"><option value="">Selecciona una categoría</option></select></label><label class="field description-field">Descripción<textarea id="activeDescription" rows="2" maxlength="160" placeholder="Opcional"></textarea></label><label class="field description-field hidden" id="personField">Persona<input id="activePerson" type="text" maxlength="80" placeholder="¿Quién realizó este movimiento?"></label></div>
     <button class="save active-save" id="saveActive" type="button">Guardar ingreso</button>
   </div>
 </div>
@@ -23,4 +23,4 @@
 <section id="movementForm" class="screen hidden"></section>
 <section id="movements" class="screen hidden"><button class="back" id="movementsBack" type="button">‹ Volver</button><h2>Registro de movimientos</h2><p class="section-note">Todos tus ingresos y gastos</p><div id="movementList" class="movement-list"></div></section>
 <section id="reports" class="screen hidden"><button class="back" id="reportsBack" type="button">‹ Volver</button><h2>Totales</h2><div class="report-card"><span>Total ingresos</span><strong id="incomeTotal">€0,00</strong></div><div class="report-card"><span>Total gastos</span><strong id="expenseTotal">€0,00</strong></div><div class="report-card balance"><span>Saldo</span><strong id="balanceTotal">€0,00</strong></div><button class="main-card" id="movementsButton" type="button"><span class="card-icon">☷</span><span><strong>Registro de movimientos</strong><small>Ver todos los movimientos</small></span><span class="arrow">›</span></button></section>
-</main><div id="toast" class="toast"></div><script src="app.js?v=13"></script></body></html>
+</main><div id="toast" class="toast"></div><script src="app.js?v=14"></script></body></html>
