@@ -1,0 +1,85 @@
+name: Windows self-hosted runner smoke test
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Validate Windows runner
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        shell: powershell
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Windows runner
+        run: |
+          Write-Host "Runner: $env:RUNNER_NAME"
+          Write-Host "OS: $env:RUNNER_OS"
+          Write-Host "Architecture: $env:RUNNER_ARCH"
+          Write-Host "Machine: $env:COMPUTERNAME"
+          Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
+          if ($env:RUNNER_OS -ne 'Windows') { throw 'Runner is not Windows.' }
+          if ($env:RUNNER_ARCH -ne 'X64') { throw 'Runner is not X64.' }
+
+      - name: Check Git and Python
+        run: |
+          git --version
+          python --version
+          python -c "import sys; print('Python executable:', sys.executable); print('Python version:', sys.version)"
+          if ($LASTEXITCODE -ne 0) { throw 'Python check failed.' }
+
+      - name: Check repository
+        run: |
+          if (-not (Test-Path 'bot.py')) { throw 'bot.py not found.' }
+          if (-not (Test-Path 'backend/main.py')) { throw 'backend/main.py not found.' }
+          if (-not (Test-Path 'requirements.txt')) { throw 'requirements.txt not found.' }
+          if (-not (Test-Path 'backend/requirements.txt')) { throw 'backend/requirements.txt not found.' }
+          git rev-parse --show-toplevel
+          git rev-parse --short HEAD
+          git status --short
+
+      - name: Install project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r backend/requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
+
+      - name: Verify installed dependencies
+        run: |
+          python -m pip check
+          if ($LASTEXITCODE -ne 0) { throw 'pip check failed.' }
+          python -c "import dotenv, openai, telegram, faster_whisper, fastapi, uvicorn; print('All required Python packages imported successfully.')"
+          if ($LASTEXITCODE -ne 0) { throw 'Python dependency import check failed.' }
+
+      - name: Validate project Python files
+        run: |
+          python -m py_compile bot.py main.py backend/main.py
+          if ($LASTEXITCODE -ne 0) { throw 'Python syntax validation failed.' }
+
+      - name: Publish runner summary
+        run: |
+          @"
+          ## Windows self-hosted runner: OK
+
+          - Runner: `$env:RUNNER_NAME`
+          - Machine: `$env:COMPUTERNAME`
+          - OS: `$env:RUNNER_OS`
+          - Architecture: `$env:RUNNER_ARCH`
+          - Python: $(python --version 2>&1)
+          - Git: $(git --version)
+          - Dependencies: `pip check` OK
+          - Python imports: OK
+          - Syntax checks: OK
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
