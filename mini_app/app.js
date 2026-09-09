@@ -39,9 +39,13 @@ const renderMovementMenu = () => {
 const renderForm = (type) => {
   const isIncome = type === 'income';
   const categories = isIncome ? ['Nómina', 'Freelance', 'Ventas', 'Inversiones', 'Otros'] : ['Vivienda', 'Alimentación', 'Transporte', 'Salud', 'Ocio', 'Compras', 'Servicios', 'Otros'];
-  menu.innerHTML = `<button class="back-button" id="back-movements" type="button"><span>‹</span> Atrás</button><section class="form-card ${type}-form"><div class="form-heading"><div class="form-icon ${type}">${isIncome ? '+' : '−'}</div><div><p class="eyebrow-dark">NUEVO MOVIMIENTO</p><h2>${isIncome ? 'Registrar ingreso' : 'Registrar gasto'}</h2></div></div><form id="movement-form"><div class="amount-field"><label for="amount">Importe</label><div class="amount-input"><span>€</span><input id="amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00" required autofocus></div><small>Introduce el importe del movimiento</small></div><div class="form-grid"><label>Fecha<input id="date" name="date" type="date" required></label><label>Categoría<select id="category" name="category" required><option value="" selected disabled>Selecciona una categoría</option>${categories.map((category) => `<option value="${category}">${category}</option>`).join('')}</select></label></div><label>Descripción <span>opcional</span><textarea id="description" name="description" rows="3" maxlength="160" placeholder="Añade una descripción"></textarea><button class="primary-button ${type}" type="submit">Guardar movimiento</button></form></section>`;
+  menu.innerHTML = `<button class="back-button" id="back-movements" type="button"><span>‹</span> Atrás</button><section class="form-card ${type}-form"><div class="form-heading"><div class="form-icon ${type}">${isIncome ? '+' : '−'}</div><div><p class="eyebrow-dark">NUEVO MOVIMIENTO</p><h2>${isIncome ? 'Registrar ingreso' : 'Registrar gasto'}</h2></div></div><form id="movement-form"><div class="amount-field"><label for="amount">Importe</label><div class="amount-input"><span>€</span><input id="amount" name="amount" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]{0,2}" autocomplete="off" enterkeyhint="done" placeholder="0,00" required autofocus></div><small>Introduce el importe del movimiento</small></div><div class="form-grid"><label>Fecha<input id="date" name="date" type="date" required></label><label>Categoría<select id="category" name="category" required><option value="" selected disabled>Selecciona una categoría</option>${categories.map((category) => `<option value="${category}">${category}</option>`).join('')}</select></label></div><label>Descripción <span>opcional</span><textarea id="description" name="description" rows="3" maxlength="160" placeholder="Añade una descripción"></textarea><button class="primary-button ${type}" type="submit">Guardar movimiento</button></form></section>`;
 
   document.getElementById('date').value = new Date().toISOString().slice(0, 10);
+  const amountInput = document.getElementById('amount');
+  amountInput.addEventListener('input', () => {
+    amountInput.value = amountInput.value.replace(/[^0-9.,]/g, '').replace(/([.,].*)[.,]/g, '$1');
+  });
   document.getElementById('back-movements').addEventListener('click', renderMovementMenu);
   document.getElementById('movement-form').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -57,6 +61,7 @@ const renderForm = (type) => {
     renderMovementMenu();
     notify(`${isIncome ? 'Ingreso' : 'Gasto'} guardado correctamente.`);
   });
+  amountInput.focus();
 };
 
 const renderHome = () => {
