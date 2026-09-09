@@ -14,7 +14,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
 
 jobs:
@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout production
         uses: actions/checkout@v4
@@ -39,19 +38,25 @@ jobs:
       - name: Assemble Pages site
         shell: bash
         run: |
+          set -euo pipefail
           rm -rf site
           mkdir -p site/dev
+          test -f production/mini_app/index.html
+          test -f development/mini_app/index.html
           cp -R production/mini_app/. site/
           cp -R development/mini_app/. site/dev/
+          echo "=== Published files ==="
+          find site -maxdepth 2 -type f | sort
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "./site"
+          path: site
 
       - name: Deploy to GitHub Pages
-        id: deployment
         uses: actions/deploy-pages@v4
