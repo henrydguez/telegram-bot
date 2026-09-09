@@ -53,6 +53,26 @@ h1 { margin: 0; font-size: 30px; line-height: 1.1; }
 
 .menu { display: grid; gap: 14px; }
 
+.back-button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  padding: 8px 12px 8px 7px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--blue-700);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.back-button span { font-size: 25px; line-height: 16px; }
+.back-button:active { opacity: .7; }
+.back-button:focus-visible { outline: 3px solid rgba(59,130,246,.35); outline-offset: 2px; }
+
 .menu-card {
   width: 100%;
   display: grid;
