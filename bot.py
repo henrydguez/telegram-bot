@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 from dotenv import load_dotenv
 from faster_whisper import WhisperModel
 from openai import AsyncOpenAI
-from telegram import Update
+from telegram import MenuButtonWebApp, Update, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 load_dotenv()
@@ -28,6 +28,8 @@ VOICE_ENABLED = os.getenv("VOICE_ENABLED", "true").lower() == "true"
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
+MINI_APP_URL = "https://henrydguez.github.io/telegram-bot/"
+MINI_APP_MENU_TEXT = "Control financiero"
 
 if not TOKEN:
     raise RuntimeError("No se encontró BOT_TOKEN. Configúralo en el entorno del bot.")
@@ -163,8 +165,25 @@ async def enviar_consulta_ia(update: Update, mensaje: str):
             await update.message.reply_text(fuentes)
 
 
+async def configurar_mini_app(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_chat:
+        return
+    try:
+        await context.bot.set_chat_menu_button(
+            chat_id=update.effective_chat.id,
+            menu_button=MenuButtonWebApp(
+                text=MINI_APP_MENU_TEXT,
+                web_app=WebAppInfo(url=MINI_APP_URL),
+            ),
+        )
+        logging.info("Mini App configurada para chat_id=%s | url=%s", update.effective_chat.id, MINI_APP_URL)
+    except Exception:
+        logging.exception("No se pudo configurar el botón de Mini App para chat_id=%s", update.effective_chat.id)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("¡Hola! 👋 Soy tu asistente de IA con NVIDIA Nemotron.\n\nPuedo responder preguntas normales, consultar información actualizada en la web y entender mensajes de voz.\n\nTambién puedes usar /buscar para forzar una búsqueda web.")
+    await configurar_mini_app(update, context)
+    await update.message.reply_text("¡Hola! 👋 Soy tu asistente de IA con NVIDIA Nemotron.\n\nPuedo responder preguntas normales, consultar información actualizada en la web y entender mensajes de voz.\n\nTambién puedes usar /buscar para forzar una búsqueda web.\n\n💶 El botón «Control financiero» abre tu Mini App financiera.")
 
 
 async def modelo(update: Update, context: ContextTypes.DEFAULT_TYPE):
