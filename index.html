@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#0b3d91"><title>Control Financiero</title><link rel="stylesheet" href="style.css?v=11"><script src="https://telegram.org/js/telegram-web-app.js"></script>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#0b3d91"><title>Control Financiero</title><link rel="stylesheet" href="style.css?v=12"><script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body><main class="app">
-<header class="hero"><p class="eyebrow">CONTROL FINANCIERO</p><h1>Mis finanzas</h1><p class="subtitle">Gestiona tus ingresos y gastos.</p></header>
+<header class="hero"><div class="hero-top"><p class="eyebrow">CONTROL FINANCIERO</p><button id="themeToggle" class="theme-toggle" type="button" aria-label="Cambiar a modo noche" title="Modo noche"><span id="themeIcon" aria-hidden="true">☾</span></button></div><h1>Mis finanzas</h1><p class="subtitle">Gestiona tus ingresos y gastos.</p></header>
 <section id="home" class="screen"><button class="main-card" id="registerButton" type="button"><span class="card-icon">↕</span><span><strong>Registro</strong><small>Registra tus ingresos y gastos</small></span><span class="arrow">›</span></button><button class="main-card" id="reportsButton" type="button"><span class="card-icon">▥</span><span><strong>Informes</strong><small>Consulta el resumen de tus finanzas</small></span><span class="arrow">›</span></button></section>
 <section id="register" class="screen hidden"><button class="back" id="backButton" type="button">‹ Volver</button><h2>Registro</h2><p class="section-note">Elige Ingresos o Gastos y utiliza un único teclado.</p>
 <div class="register-panel">
@@ -23,4 +23,4 @@
 <section id="movementForm" class="screen hidden"></section>
 <section id="movements" class="screen hidden"><button class="back" id="movementsBack" type="button">‹ Volver</button><h2>Registro de movimientos</h2><p class="section-note">Todos tus ingresos y gastos</p><div id="movementList" class="movement-list"></div></section>
 <section id="reports" class="screen hidden"><button class="back" id="reportsBack" type="button">‹ Volver</button><h2>Totales</h2><div class="report-card"><span>Total ingresos</span><strong id="incomeTotal">€0,00</strong></div><div class="report-card"><span>Total gastos</span><strong id="expenseTotal">€0,00</strong></div><div class="report-card balance"><span>Saldo</span><strong id="balanceTotal">€0,00</strong></div><button class="main-card" id="movementsButton" type="button"><span class="card-icon">☷</span><span><strong>Registro de movimientos</strong><small>Ver todos los movimientos</small></span><span class="arrow">›</span></button></section>
-</main><div id="toast" class="toast"></div><script src="app.js?v=11"></script></body></html>
+</main><div id="toast" class="toast"></div><script src="app.js?v=12"></script></body></html>
