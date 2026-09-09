@@ -1,6 +1,6 @@
 const tg=window.Telegram?.WebApp;
 const STORAGE_KEY='financial_movements_v1',THEME_KEY='financial_theme_v1',CURRENCY_KEY='financial_currency_v1',SETTINGS_KEY='financial_settings_v1';
-const CURRENCIES={EUR:{symbol:'€',code:'EUR',locale:'es-ES',label:'Euro'},USD:{symbol:'$',code:'USD',locale:'en-US',label:'Dólar estadounidense'},COP:{symbol:'$CO',code:'COP',locale:'es-CO',label:'Peso colombiano'}};
+const CURRENCIES={EUR:{symbol:'€',code:'EUR',locale:'es-ES',label:'Euro'},USD:{symbol:'$',code:'USD',locale:'en-US',label:'Dólar estadounidense'},COP:{symbol:'$CO',code:'COP',locale:'es-CO',label:'Peso colombiano'},GBP:{symbol:'£',code:'GBP',locale:'en-GB',label:'Libra esterlina'},CHF:{symbol:'CHF',code:'CHF',locale:'de-CH',label:'Franco suizo'},CAD:{symbol:'CA$',code:'CAD',locale:'en-CA',label:'Dólar canadiense'},AUD:{symbol:'A$',code:'AUD',locale:'en-AU',label:'Dólar australiano'},BRL:{symbol:'R$',code:'BRL',locale:'pt-BR',label:'Real brasileño'},MXN:{symbol:'MX$',code:'MXN',locale:'es-MX',label:'Peso mexicano'}};
 const DEFAULT_CATEGORIES={income:['Bizum','Nómina','Otro','Pago','Transferencia'],expense:['Vivienda','Alimentación','Transporte','Salud','Ocio','Compras','Servicios','Otros']};
 const DEFAULT_SETTINGS={categories:{income:[],expense:[]},accounts:['Efectivo','Banco','Tarjeta'],budget:0,alerts:true};
 if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0b3d91');}
