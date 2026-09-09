@@ -21,6 +21,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout single app
         uses: actions/checkout@v4
@@ -52,6 +55,7 @@ jobs:
           printf '{\n  "commit": "%s",\n  "path": "/"\n}\n' "$(git -C app rev-parse HEAD)" > site/deployment-info.json
           test -f site/index.html
           test -f site/app.js
+          test -f site/style.css
           echo "single app: $(git -C app rev-parse HEAD) -> /"
 
       - name: Configure Pages
@@ -60,7 +64,7 @@ jobs:
           enablement: true
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: site
 
