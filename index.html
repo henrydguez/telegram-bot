@@ -9,7 +9,7 @@
 <script>
 const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand()}
 // URL HTTPS temporal del Cloudflare Quick Tunnel para esta prueba local.
-const API_URL=window.API_URL||"https://arms-syndication-pam-behaviour.trycloudflare.com";const messagesEl=document.getElementById('messages'),input=document.getElementById('input'),send=document.getElementById('send'),status=document.getElementById('status');let history=[],busy=false;
+const API_URL=window.API_URL||"https://elected-jar-late-overcome.trycloudflare.com";const messagesEl=document.getElementById('messages'),input=document.getElementById('input'),send=document.getElementById('send'),status=document.getElementById('status');let history=[],busy=false;
 function add(role,text='',typing=false){const row=document.createElement('div');row.className='row '+role;const b=document.createElement('div');b.className='bubble';if(typing)b.innerHTML='<span class="typing"><i></i><i></i><i></i></span>';else b.textContent=text;row.appendChild(b);messagesEl.appendChild(row);messagesEl.scrollTop=messagesEl.scrollHeight;return b}
 function welcome(){add('assistant','¡Hola! 👋 Soy tu asistente de IA.\n\nEscribe una pregunta y verás cómo Nemotron genera la respuesta en tiempo real.')}
 function setStatus(text,on=true){status.textContent='● '+text;status.className='status'+(on?'':' off')}
