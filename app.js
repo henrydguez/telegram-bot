@@ -12,7 +12,7 @@ const personCategories=['Bizum','Transferencia'];
 const descriptionCategories=['Otros','Bizum','Transferencia'];
 
 function show(name){screenList.forEach(s=>s.classList.add('hidden'));if(screens[name])screens[name].classList.remove('hidden');const header=$('appHeader');if(header)header.classList.toggle('hidden',name==='register'||name==='movements');window.scrollTo(0,0);if(name==='register')renderRecentMovements();if(name==='movements')renderMovements();if(name==='reports')renderReportMovements()}
-function selectRegisterTab(tab){const registerTab=$('registerTab'),movementsTab=$('movementsTab');if(!registerTab||!movementsTab)return;const isRegister=tab==='register';registerTab.classList.toggle('active',isRegister);movementsTab.classList.toggle('active',!isRegister);registerTab.setAttribute('aria-selected',isRegister);movementsTab.setAttribute('aria-selected',!isRegister);show(isRegister?'register':'movements')}
+function selectRegisterTab(tab){const tabs=document.querySelectorAll('.register-tab');if(!tabs.length)return;const isRegister=tab==='register';tabs.forEach(button=>{const active=button.dataset.tab===tab;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active))});show(isRegister?'register':'movements')}
 function money(n){return `€${Number(n).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}`}
 function today(){return new Date().toISOString().slice(0,10)}
 function renderAmount(){const input=$('activeAmount');if(!input)return;const n=Number(digits[activeType]||0)/100;input.value=n?n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}):''}
@@ -43,8 +43,8 @@ $('reportsButton')?.addEventListener('click',()=>{updateReports();renderReportMo
 $('backButton')?.addEventListener('click',()=>{editingIndex=null;show('home')});
 $('reportsBack')?.addEventListener('click',()=>show('home'));
 $('formBack')?.addEventListener('click',()=>selectRegisterTab('register'));
-$('registerTab')?.addEventListener('click',()=>selectRegisterTab('register'));
-$('movementsTab')?.addEventListener('click',()=>selectRegisterTab('movements'));
+document.querySelectorAll('.register-tab[data-tab="register"]').forEach(button=>button.addEventListener('click',()=>selectRegisterTab('register')));
+document.querySelectorAll('.register-tab[data-tab="movements"]').forEach(button=>button.addEventListener('click',()=>selectRegisterTab('movements')));
 $('movementsBack')?.addEventListener('click',()=>selectRegisterTab('register'));
 $('saveActive')?.addEventListener('click',saveMovement);
 $('incomeTab')?.addEventListener('click',()=>switchType('income'));
