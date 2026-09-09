@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/configure-telegram-mini-app.yml'
+      - 'mini_app/**'
   workflow_dispatch:
 
 permissions:
