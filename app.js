@@ -21,7 +21,7 @@ function saveMovement(){const amount=Number(digits[activeType]||0)/100,category=
 function updatePersonField(){const field=$('personField'),input=$('activePerson'),category=$('activeCategory')?.value,showPerson=personCategories.includes(category);if(!field||!input)return;field.classList.toggle('hidden',!showPerson);input.required=showPerson}
 function renderCategories(){const select=$('activeCategory');if(!select)return;select.innerHTML='<option value="">Selecciona una categoría</option>'+categories[activeType].map(c=>`<option>${c}</option>`).join('');updatePersonField()}
 function switchType(type){activeType=type;const income=$('incomeTab'),expense=$('expenseTab');income.classList.toggle('active',type==='income');expense.classList.toggle('active',type==='expense');income.setAttribute('aria-selected',type==='income');expense.setAttribute('aria-selected',type==='expense');$('saveActive').textContent=type==='income'?'Guardar ingreso':'Guardar gasto';renderCategories();renderAmount();$('activeDate').value=today();$('activeCategory').value='';$('activeDescription').value='';$('activePerson').value='';updatePersonField()}
-function applyTheme(mode){const dark=mode==='dark',html=document.documentElement;html.classList.toggle('theme-light',!dark);html.classList.toggle('theme-dark',dark);document.body.classList.toggle('theme-light',!dark);document.body.classList.toggle('theme-dark',dark);const button=$('themeToggle'),icon=$('themeIcon');if(button&&icon){icon.textContent=dark?'☀':'☾';button.setAttribute('aria-label',dark?'Cambiar a modo día':'Cambiar a modo noche');button.title=dark?'Modo día':'Modo noche'}localStorage.setItem('theme_mode_v1',dark?'dark':'light')}
+function applyTheme(mode){const dark=mode==='dark',html=document.documentElement;html.classList.toggle('theme-light',!dark);html.classList.toggle('theme-dark',dark);document.body.classList.toggle('theme-light',!dark);document.body.classList.toggle('theme-dark',dark);const buttons=[['themeToggle','themeIcon'],['registerThemeToggle','registerThemeIcon']];buttons.forEach(([buttonId,iconId])=>{const button=$(buttonId),icon=$(iconId);if(button&&icon){icon.textContent=dark?'☀':'☾';button.setAttribute('aria-label',dark?'Cambiar a modo día':'Cambiar a modo noche');button.title=dark?'Modo día':'Modo noche'}});localStorage.setItem('theme_mode_v1',dark?'dark':'light')}
 
 $('registerButton')?.addEventListener('click',()=>show('register'));
 $('reportsButton')?.addEventListener('click',()=>{updateReports();show('reports')});
@@ -33,7 +33,9 @@ $('movementsBack')?.addEventListener('click',()=>show('reports'));
 $('saveActive')?.addEventListener('click',saveMovement);
 $('incomeTab')?.addEventListener('click',()=>switchType('income'));
 $('expenseTab')?.addEventListener('click',()=>switchType('expense'));
-$('themeToggle')?.addEventListener('click',()=>applyTheme(document.documentElement.classList.contains('theme-dark')?'light':'dark'));
+const toggleTheme=()=>applyTheme(document.documentElement.classList.contains('theme-dark')?'light':'dark');
+$('themeToggle')?.addEventListener('click',toggleTheme);
+$('registerThemeToggle')?.addEventListener('click',toggleTheme);
 $('activeCategory')?.addEventListener('change',updatePersonField);
 
 const input=$('activeAmount');
