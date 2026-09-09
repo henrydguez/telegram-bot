@@ -2,10 +2,10 @@ name: Deploy Financial Mini App
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
     paths:
-      - "mini_app/**"
-      - ".github/workflows/deploy-mini-app.yml"
+      - 'mini_app/**'
+      - '.github/workflows/deploy-mini-app.yml'
   workflow_dispatch:
 
 permissions:
@@ -25,49 +25,40 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout single app
-        uses: actions/checkout@v4
+      - name: Checkout canonical app
+        uses: actions/checkout@v6
         with:
           ref: main
-          path: app
           fetch-depth: 1
-
-      - name: Validate Mini App
+      - name: Validate canonical Mini App
         shell: bash
         run: |
           set -euo pipefail
-          test -f app/mini_app/index.html
-          test -f app/mini_app/app.js
-          test -f app/mini_app/style.css
-          if grep -RqiE 'CONTROL FINANCIERO · DEV|APP_ENV.?=.?development|/dev/' app/mini_app; then
-            echo 'ERROR: se encontró configuración o marcador DEV en la app única.'
+          test -f mini_app/index.html
+          test -f mini_app/app.js
+          test -f mini_app/style.css
+          grep -q '<strong>Registro</strong>' mini_app/index.html
+          if grep -RqiE 'CONTROL FINANCIERO · DEV|APP_ENV.?=.?development|/dev/' mini_app; then
+            echo 'ERROR: se encontró una referencia DEV en la única Mini App.'
             exit 1
           fi
-          grep -q '<strong>Registro</strong>' app/mini_app/index.html
-
-      - name: Assemble Pages site
+      - name: Prepare Pages artifact
         shell: bash
         run: |
           set -euo pipefail
           rm -rf site
           mkdir -p site
-          cp -R app/mini_app/. site/
-          printf '{\n  "commit": "%s",\n  "path": "/"\n}\n' "$(git -C app rev-parse HEAD)" > site/deployment-info.json
+          cp -R mini_app/. site/
+          printf '{\n  "commit": "%s",\n  "source": "mini_app",\n  "path": "/"\n}\n' "$(git rev-parse HEAD)" > site/deployment-info.json
           test -f site/index.html
           test -f site/app.js
           test -f site/style.css
-          echo "single app: $(git -C app rev-parse HEAD) -> /"
-
-      - name: Configure Pages
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: site
-
-      - name: Deploy to GitHub Pages
+      - name: Deploy canonical Mini App
         id: deployment
         uses: actions/deploy-pages@v4
