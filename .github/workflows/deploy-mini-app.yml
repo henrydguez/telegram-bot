@@ -2,7 +2,7 @@ name: Deploy Financial Mini App
 
 on:
   push:
-    branches: ["main", "develop"]
+    branches: ["main"]
     paths:
       - "mini_app/**"
       - ".github/workflows/deploy-mini-app.yml"
@@ -13,7 +13,6 @@ permissions:
   pages: write
   id-token: write
 
-# One shared Pages deployment: the newest change always wins.
 concurrency:
   group: financial-mini-app-pages
   cancel-in-progress: true
@@ -22,53 +21,38 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
-      - name: Checkout production
+      - name: Checkout single app
         uses: actions/checkout@v4
         with:
           ref: main
-          path: production
+          path: app
           fetch-depth: 1
 
-      - name: Checkout DEV
-        uses: actions/checkout@v4
-        with:
-          ref: develop
-          path: development
-          fetch-depth: 1
-
-      - name: Validate source versions
+      - name: Validate Mini App
         shell: bash
         run: |
           set -euo pipefail
-          test -f production/mini_app/index.html
-          test -f development/mini_app/index.html
-          test -f development/mini_app/dev-config.js
-          grep -q 'Control Financiero · DEV' development/mini_app/index.html
-          grep -q '<strong>Registro</strong>' development/mini_app/index.html
-          if grep -q 'Control Financiero · DEV' production/mini_app/index.html; then
-            echo 'ERROR: production contains the DEV marker.'
+          test -f app/mini_app/index.html
+          test -f app/mini_app/app.js
+          test -f app/mini_app/style.css
+          if grep -RqiE 'CONTROL FINANCIERO · DEV|APP_ENV.?=.?development|/dev/' app/mini_app; then
+            echo 'ERROR: se encontró configuración o marcador DEV en la app única.'
             exit 1
           fi
+          grep -q '<strong>Registro</strong>' app/mini_app/index.html
 
       - name: Assemble Pages site
         shell: bash
         run: |
           set -euo pipefail
           rm -rf site
-          mkdir -p site/dev
-          cp -R production/mini_app/. site/
-          cp -R development/mini_app/. site/dev/
-          printf '{\n  "production_commit": "%s",\n  "develop_commit": "%s",\n  "develop_path": "/dev/"\n}\n' \
-            "$(git -C production rev-parse HEAD)" \
-            "$(git -C development rev-parse HEAD)" > site/deployment-info.json
+          mkdir -p site
+          cp -R app/mini_app/. site/
+          printf '{\n  "commit": "%s",\n  "path": "/"\n}\n' "$(git -C app rev-parse HEAD)" > site/deployment-info.json
           test -f site/index.html
-          test -f site/dev/index.html
-          grep -q '<strong>Registro</strong>' site/dev/index.html
-          echo "production: $(git -C production rev-parse HEAD) -> /"
-          echo "develop:    $(git -C development rev-parse HEAD) -> /dev/"
-          find site -maxdepth 2 -type f | sort
+          test -f site/app.js
+          echo "single app: $(git -C app rev-parse HEAD) -> /"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
