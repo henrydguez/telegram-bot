@@ -12,15 +12,12 @@ from urllib.request import Request, urlopen
 from dotenv import load_dotenv
 from faster_whisper import WhisperModel
 from openai import AsyncOpenAI
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
+from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 load_dotenv()
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
@@ -36,17 +33,10 @@ WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
 
 if not TOKEN:
     raise RuntimeError("No se encontró BOT_TOKEN. Configúralo en el entorno del bot.")
-
 if not NVIDIA_API_KEY:
     raise RuntimeError("No se encontró NVIDIA_API_KEY. Configúrala en .env o en las variables de entorno del servicio.")
 
-ai_client = AsyncOpenAI(
-    api_key=NVIDIA_API_KEY,
-    base_url=NVIDIA_BASE_URL,
-    timeout=60.0,
-    max_retries=2,
-)
-
+ai_client = AsyncOpenAI(api_key=NVIDIA_API_KEY, base_url=NVIDIA_BASE_URL, timeout=60.0, max_retries=2)
 whisper_model = None
 
 SYSTEM_PROMPT = """
@@ -62,19 +52,11 @@ Si las fuentes son contradictorias, indícalo y prioriza fuentes oficiales o de 
 Si no tienes suficiente información o no puedes verificar algo, dilo claramente.
 """.strip()
 
-WEB_TRIGGERS = (
-    "hoy", "ahora", "actual", "actualizado", "último", "última", "últimos", "últimas",
-    "noticias", "reciente", "recientes", "esta semana", "este mes", "2026", "precio",
-    "precios", "cotización", "cotiza", "tipo de cambio", "horario", "horarios", "abierto",
-    "abierta", "disponible", "disponibilidad", "evento", "eventos", "partido", "resultados",
-    "quién es el actual", "quien es el actual", "busca", "buscar", "investiga", "consulta en internet",
-    "en internet", "web", "fuentes", "según internet", "qué pasó", "que paso", "últimas noticias",
-)
+WEB_TRIGGERS = ("hoy", "ahora", "actual", "actualizado", "último", "última", "últimos", "últimas", "noticias", "reciente", "recientes", "esta semana", "este mes", "2026", "precio", "precios", "cotización", "cotiza", "tipo de cambio", "horario", "horarios", "abierto", "abierta", "disponible", "disponibilidad", "evento", "eventos", "partido", "resultados", "quién es el actual", "quien es el actual", "busca", "buscar", "investiga", "consulta en internet", "en internet", "web", "fuentes", "según internet", "qué pasó", "que paso", "últimas noticias")
 
 
 def necesita_busqueda_web(texto: str) -> bool:
-    texto_normalizado = " ".join(texto.lower().split())
-    return any(trigger in texto_normalizado for trigger in WEB_TRIGGERS)
+    return any(trigger in " ".join(texto.lower().split()) for trigger in WEB_TRIGGERS)
 
 
 def limpiar_url(url: str) -> str:
@@ -86,84 +68,45 @@ def limpiar_url(url: str) -> str:
 
 def buscar_en_web(query: str, max_results: int = WEB_SEARCH_MAX_RESULTS) -> list[dict]:
     url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
-    request = Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; TelegramAIBot/1.0; +https://telegram.org/)"
-        },
-    )
-
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; TelegramAIBot/1.0; +https://telegram.org/)"})
     with urlopen(request, timeout=10) as response:
         page = response.read().decode("utf-8", errors="replace")
-
     results = []
-    pattern = re.compile(
-        r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-        re.IGNORECASE | re.DOTALL,
-    )
-    snippet_pattern = re.compile(
-        r'<(?:a|div)[^>]+class="result__snippet"[^>]*>(.*?)</(?:a|div)>',
-        re.IGNORECASE | re.DOTALL,
-    )
-
-    links = pattern.findall(page)
-    snippets = snippet_pattern.findall(page)
-
+    pattern = re.compile(r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>', re.I | re.S)
+    snippet_pattern = re.compile(r'<(?:a|div)[^>]+class="result__snippet"[^>]*>(.*?)</(?:a|div)>', re.I | re.S)
+    links, snippets = pattern.findall(page), snippet_pattern.findall(page)
     for index, (raw_url, raw_title) in enumerate(links[:max_results]):
         clean_url = limpiar_url(raw_url)
-        title = re.sub(r"<[^>]+>", " ", raw_title)
-        title = html.unescape(" ".join(title.split()))
+        title = html.unescape(" ".join(re.sub(r"<[^>]+>", " ", raw_title).split()))
         snippet = ""
         if index < len(snippets):
-            snippet = re.sub(r"<[^>]+>", " ", snippets[index])
-            snippet = html.unescape(" ".join(snippet.split()))
-
+            snippet = html.unescape(" ".join(re.sub(r"<[^>]+>", " ", snippets[index]).split()))
         if clean_url and title:
             results.append({"title": title, "url": clean_url, "snippet": snippet})
-
     return results
 
 
 def formatear_resultados_web(resultados: list[dict]) -> str:
     if not resultados:
         return "No se encontraron resultados web relevantes."
-
     partes = ["RESULTADOS DE BÚSQUEDA WEB:"]
     for i, resultado in enumerate(resultados, start=1):
-        partes.append(
-            f"[{i}] {resultado['title']}\n"
-            f"URL: {resultado['url']}\n"
-            f"Resumen: {resultado['snippet']}"
-        )
+        partes.append(f"[{i}] {resultado['title']}\nURL: {resultado['url']}\nResumen: {resultado['snippet']}")
     return "\n\n".join(partes)
 
 
 def obtener_whisper_model():
     global whisper_model
     if whisper_model is None:
-        logging.info(
-            "Cargando Whisper | modelo=%s | device=%s | compute_type=%s",
-            WHISPER_MODEL,
-            WHISPER_DEVICE,
-            WHISPER_COMPUTE_TYPE,
-        )
-        whisper_model = WhisperModel(
-            WHISPER_MODEL,
-            device=WHISPER_DEVICE,
-            compute_type=WHISPER_COMPUTE_TYPE,
-        )
+        logging.info("Cargando Whisper | modelo=%s | device=%s | compute_type=%s", WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE_TYPE)
+        whisper_model = WhisperModel(WHISPER_MODEL, device=WHISPER_DEVICE, compute_type=WHISPER_COMPUTE_TYPE)
         logging.info("Whisper listo")
     return whisper_model
 
 
 def transcribir_audio(audio_path: str) -> str:
     model = obtener_whisper_model()
-    segments, info = model.transcribe(
-        audio_path,
-        language="es",
-        beam_size=5,
-        vad_filter=True,
-    )
+    segments, info = model.transcribe(audio_path, language="es", beam_size=5, vad_filter=True)
     texto = " ".join(segment.text.strip() for segment in segments if segment.text.strip()).strip()
     logging.info("Voz transcrita | idioma=%s | texto=%s", info.language, texto)
     return texto
@@ -171,65 +114,23 @@ def transcribir_audio(audio_path: str) -> str:
 
 async def preparar_mensaje_modelo(mensaje: str, contexto_web: str | None = None) -> str:
     if contexto_web:
-        return (
-            "Usa los siguientes resultados de búsqueda web como contexto para responder. "
-            "Cita las fuentes con [1], [2], etc. y no inventes información que no esté respaldada.\n\n"
-            f"{contexto_web}\n\nPREGUNTA DEL USUARIO:\n{mensaje}"
-        )
+        return "Usa los siguientes resultados de búsqueda web como contexto para responder. Cita las fuentes con [1], [2], etc. y no inventes información que no esté respaldada.\n\n" + f"{contexto_web}\n\nPREGUNTA DEL USUARIO:\n{mensaje}"
     return mensaje
 
 
-async def llamar_modelo(mensaje: str, contexto_web: str | None = None) -> str:
-    user_content = await preparar_mensaje_modelo(mensaje, contexto_web)
-    response = await ai_client.chat.completions.create(
-        model=NVIDIA_MODEL,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-        max_tokens=1200,
-        temperature=0.5,
-        stream=False,
-    )
-
-    respuesta = (response.choices[0].message.content or "").strip()
-    if not respuesta:
-        raise RuntimeError("NVIDIA devolvió una respuesta vacía")
-    return respuesta
-
-
 async def llamar_modelo_stream(mensaje: str, contexto_web: str | None = None):
-    """Genera texto con Nemotron en streaming y entrega fragmentos progresivamente."""
     user_content = await preparar_mensaje_modelo(mensaje, contexto_web)
-    stream = await ai_client.chat.completions.create(
-        model=NVIDIA_MODEL,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-        max_tokens=1200,
-        temperature=0.5,
-        stream=True,
-    )
-
+    stream = await ai_client.chat.completions.create(model=NVIDIA_MODEL, messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_content}], max_tokens=1200, temperature=0.5, stream=True)
     async for chunk in stream:
-        if not chunk.choices:
-            continue
-        delta = chunk.choices[0].delta.content
-        if delta:
-            yield delta
+        if chunk.choices and chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
 
 
 async def enviar_respuesta_stream(update: Update, mensaje: str, contexto_web: str | None = None):
-    """Muestra la respuesta en Telegram mientras Nemotron la genera."""
     mensaje_telegram = await update.message.reply_text("🤖 Nemotron está escribiendo…")
-    respuesta = ""
-    ultima_edicion = 0.0
-
+    respuesta, ultima_edicion = "", 0.0
     async for fragmento in llamar_modelo_stream(mensaje, contexto_web):
         respuesta += fragmento
-        # Telegram limita la frecuencia de edición. Actualizamos cada ~0,8 s
-        # o cuando ya hay suficiente texto para que el cambio sea visible.
         ahora = asyncio.get_running_loop().time()
         if ahora - ultima_edicion >= 0.8 and respuesta.strip():
             try:
@@ -237,26 +138,19 @@ async def enviar_respuesta_stream(update: Update, mensaje: str, contexto_web: st
                 ultima_edicion = ahora
             except Exception as exc:
                 logging.warning("No se pudo actualizar el mensaje durante streaming: %s", exc)
-
     respuesta = respuesta.strip()
     if not respuesta:
         raise RuntimeError("NVIDIA devolvió una respuesta vacía")
-
-    # Telegram permite 4096 caracteres por mensaje. Si la respuesta supera el límite,
-    # dejamos el primer tramo en el mensaje dinámico y continuamos en mensajes separados.
     await mensaje_telegram.edit_text(respuesta[:4096])
     restante = respuesta[4096:]
     while restante:
         await update.message.reply_text(restante[:4096])
         restante = restante[4096:]
-
     return respuesta
 
 
 async def enviar_consulta_ia(update: Update, mensaje: str):
-    contexto_web = None
-    resultados = []
-
+    contexto_web, resultados = None, []
     if WEB_SEARCH_ENABLED and necesita_busqueda_web(mensaje):
         logging.info("Búsqueda web automática: %s", mensaje)
         try:
@@ -264,130 +158,84 @@ async def enviar_consulta_ia(update: Update, mensaje: str):
             contexto_web = formatear_resultados_web(resultados)
         except Exception:
             logging.exception("La búsqueda web falló; continúo solo con IA")
-
     await enviar_respuesta_stream(update, mensaje, contexto_web)
-
     if contexto_web and resultados:
-        fuentes = "🔗 Fuentes consultadas:\n" + "\n".join(
-            f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1)
-        )
+        fuentes = "🔗 Fuentes consultadas:\n" + "\n".join(f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1))
         if len(fuentes) <= 3500:
             await update.message.reply_text(fuentes)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[
-        InlineKeyboardButton("🚀 Abrir Mini App", web_app=WebAppInfo(url=MINI_APP_URL))
-    ]]
-    await update.message.reply_text(
-        "¡Hola! 👋 Soy tu asistente de IA con NVIDIA Nemotron.\n\n"
-        "Puedo responder preguntas normales, consultar información actualizada en la web y entender mensajes de voz.\n\n"
-        "También puedes usar /buscar para forzar una búsqueda web.",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+    await update.message.reply_text("¡Hola! 👋 Soy tu asistente de IA con NVIDIA Nemotron.\n\nPuedo responder preguntas normales, consultar información actualizada en la web y entender mensajes de voz.\n\nLa Mini App se abre desde el botón inferior del chat.\n\nTambién puedes usar /buscar para forzar una búsqueda web.")
 
 
 async def abrir_app(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[
-        InlineKeyboardButton("🚀 Abrir Mini App", web_app=WebAppInfo(url=MINI_APP_URL))
-    ]]
-    await update.message.reply_text("Aquí tienes tu Mini App:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text("📱 La Mini App se abre desde el botón inferior del chat de Telegram.")
 
 
 async def modelo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        f"🤖 Motor activo: NVIDIA Nemotron\n"
-        f"🧠 Modelo: {NVIDIA_MODEL}\n"
-        f"🌐 API: NVIDIA NIM\n"
-        f"🔎 Búsqueda web: {'activa' if WEB_SEARCH_ENABLED else 'desactivada'}\n"
-        f"🎙️ Voz: {'activa' if VOICE_ENABLED else 'desactivada'}\n"
-        f"📝 Whisper: {WHISPER_MODEL}\n"
-        f"📱 Mini App: conectada\n"
-        f"⚡ Streaming: activo"
-    )
+    await update.message.reply_text(f"🤖 Motor activo: NVIDIA Nemotron\n🧠 Modelo: {NVIDIA_MODEL}\n🌐 API: NVIDIA NIM\n🔎 Búsqueda web: {'activa' if WEB_SEARCH_ENABLED else 'desactivada'}\n🎙️ Voz: {'activa' if VOICE_ENABLED else 'desactivada'}\n📝 Whisper: {WHISPER_MODEL}\n📱 Mini App: conectada\n⚡ Streaming: activo")
 
 
 async def buscar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
-
     query = " ".join(context.args).strip()
     if not query:
         await update.message.reply_text("Uso: /buscar qué ha pasado hoy con... ")
         return
-
     if not WEB_SEARCH_ENABLED:
         await update.message.reply_text("🔎 La búsqueda web está desactivada en la configuración.")
         return
-
     try:
         await update.message.reply_text("🔎 Buscando información actualizada...")
         resultados = buscar_en_web(query)
-        contexto = formatear_resultados_web(resultados)
-        await enviar_respuesta_stream(update, query, contexto)
-
+        await enviar_respuesta_stream(update, query, formatear_resultados_web(resultados))
         if resultados:
-            fuentes = "\n\n🔗 Fuentes:\n" + "\n".join(
-                f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1)
-            )
+            fuentes = "\n\n🔗 Fuentes:\n" + "\n".join(f"[{i}] {r['url']}" for i, r in enumerate(resultados, start=1))
             if len(fuentes) <= 3500:
                 await update.message.reply_text(fuentes)
-
     except Exception:
         logging.exception("Error durante la búsqueda web")
-        await update.message.reply_text(
-            "⚠️ No he podido realizar la búsqueda web en este momento. Inténtalo de nuevo."
-        )
+        await update.message.reply_text("⚠️ No he podido realizar la búsqueda web en este momento. Inténtalo de nuevo.")
 
 
 async def procesar_voz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.voice:
         return
-
     if not VOICE_ENABLED:
         await update.message.reply_text("🎙️ La función de voz está desactivada.")
         return
-
     try:
         await update.message.reply_text("🎙️ Entendido. Estoy transcribiendo tu mensaje...")
-
         telegram_file = await context.bot.get_file(update.message.voice.file_id)
         with tempfile.TemporaryDirectory(prefix="telegram_voice_") as temp_dir:
             audio_path = Path(temp_dir) / "mensaje.ogg"
             await telegram_file.download_to_drive(custom_path=str(audio_path))
             texto = transcribir_audio(str(audio_path))
-
         if not texto:
             await update.message.reply_text("⚠️ No he podido entender el audio. Inténtalo de nuevo, por favor.")
             return
-
         await enviar_consulta_ia(update, texto)
-
     except Exception:
         logging.exception("Error procesando mensaje de voz")
-        await update.message.reply_text(
-            "⚠️ No he podido procesar el mensaje de voz. Revisa el registro de la terminal para ver el error exacto."
-        )
+        await update.message.reply_text("⚠️ No he podido procesar el mensaje de voz. Revisa el registro de la terminal para ver el error exacto.")
 
 
 async def procesar_mini_app(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.web_app_data:
         return
-
     try:
         payload = json.loads(update.message.web_app_data.data)
         if payload.get("type") != "ask_ai":
             return
-
         mensaje = str(payload.get("message", "")).strip()
         if not mensaje:
             await update.message.reply_text("⚠️ La Mini App no recibió ninguna pregunta.")
             return
-
         logging.info("Consulta desde Mini App | usuario=%s | mensaje=%s", update.effective_user.id if update.effective_user else "?", mensaje)
         await update.message.reply_text("📱 Consulta recibida desde la Mini App. Estoy procesándola...")
         await enviar_consulta_ia(update, mensaje)
-
     except Exception:
         logging.exception("Error procesando datos de la Mini App")
         await update.message.reply_text("⚠️ No he podido procesar la consulta de la Mini App.")
@@ -396,18 +244,14 @@ async def procesar_mini_app(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def responder_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
-
     mensaje = update.message.text.strip()
     if not mensaje:
         return
-
     try:
         await enviar_consulta_ia(update, mensaje)
     except Exception:
         logging.exception("Error al consultar NVIDIA Nemotron")
-        await update.message.reply_text(
-            "⚠️ No he podido procesar tu mensaje en este momento. Revisa el registro de la terminal para ver el error exacto."
-        )
+        await update.message.reply_text("⚠️ No he podido procesar tu mensaje en este momento. Revisa el registro de la terminal para ver el error exacto.")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
