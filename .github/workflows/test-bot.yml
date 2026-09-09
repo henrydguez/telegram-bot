@@ -2,7 +2,7 @@ name: Test Telegram Bot
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "develop"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -28,3 +28,13 @@ jobs:
 
       - name: Compile bot
         run: python -m py_compile bot.py
+
+      - name: Validate Mini App files
+        run: |
+          test -f mini_app/index.html
+          test -f mini_app/style.css
+          test -f mini_app/app.js
+          grep -q "Control de gastos" mini_app/index.html
+          grep -q "Informes" mini_app/index.html
+          grep -q "Ingreso" mini_app/app.js
+          grep -q "Gastos" mini_app/app.js
