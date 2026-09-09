@@ -1,8 +1,8 @@
-name: Deploy Financial Mini App
+name: Deploy Financial Mini App DEV
 
 on:
   push:
-    branches: ["main"]
+    branches: ["develop"]
     paths:
       - "mini_app/**"
       - ".github/workflows/deploy-mini-app.yml"
@@ -14,27 +14,29 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: "pages-dev"
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  deploy-dev:
     runs-on: ubuntu-latest
     environment:
-      name: github-pages
+      name: github-pages-dev
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
+      - name: Checkout DEV
         uses: actions/checkout@v4
+        with:
+          ref: develop
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload artifact
+      - name: Upload DEV artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: "./mini_app"
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy DEV Mini App
         id: deployment
         uses: actions/deploy-pages@v4
