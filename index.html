@@ -34,15 +34,12 @@
     <section id="register" class="screen hidden" aria-label="Registro">
       <button class="back" id="backButton" type="button">‹ Volver</button>
       <h2>Registro</h2>
-      <p class="section-note">¿Qué quieres registrar?</p>
+      <p class="section-note">Selecciona qué quieres registrar y utiliza el teclado.</p>
       <div class="choice-grid">
-        <button class="choice income" id="incomeButton" type="button"><span>＋</span><strong>Ingreso</strong><small>Dinero recibido</small></button>
+        <button class="choice income selected" id="incomeButton" type="button"><span>＋</span><strong>Ingreso</strong><small>Dinero recibido</small></button>
         <button class="choice expense" id="expenseButton" type="button"><span>−</span><strong>Gastos</strong><small>Dinero gastado</small></button>
       </div>
-    </section>
 
-    <section id="amount" class="screen hidden" aria-label="Cantidad">
-      <button class="back" id="amountBack" type="button">‹ Volver</button>
       <div class="amount-heading"><span id="amountType">Ingreso</span><small>Introduce el importe</small></div>
       <div class="amount-display"><span>€</span><strong id="amountValue">0,00</strong></div>
       <div class="keypad" aria-label="Teclado numérico">
