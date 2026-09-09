@@ -9,7 +9,7 @@ let activeType='income';
 const categories={income:['Salario','Trabajo','Ventas','Inversiones','Bizum','Transferencia','Otros'],expense:['Alimentación','Transporte','Vivienda','Ocio','Compras','Salud','Bizum','Transferencia','Otros']};
 const personCategories=['Bizum','Transferencia'];
 
-function show(name){screenList.forEach(s=>s.classList.add('hidden'));if(screens[name])screens[name].classList.remove('hidden');window.scrollTo(0,0)}
+function show(name){screenList.forEach(s=>s.classList.add('hidden'));if(screens[name])screens[name].classList.remove('hidden');const header=$('appHeader');if(header)header.classList.toggle('hidden',name==='register');window.scrollTo(0,0)}
 function money(n){return `€${Number(n).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}`}
 function today(){return new Date().toISOString().slice(0,10)}
 function renderAmount(){const input=$('activeAmount');if(!input)return;const n=Number(digits[activeType]||0)/100;input.value=n?n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}):''}
