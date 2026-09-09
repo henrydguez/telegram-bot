@@ -15,71 +15,73 @@ jobs:
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 20
 
-    defaults:
-      run:
-        shell: powershell
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Check Windows runner
+        shell: cmd
         run: |
-          Write-Host "Runner: $env:RUNNER_NAME"
-          Write-Host "OS: $env:RUNNER_OS"
-          Write-Host "Architecture: $env:RUNNER_ARCH"
-          Write-Host "Machine: $env:COMPUTERNAME"
-          Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
-          if ($env:RUNNER_OS -ne 'Windows') { throw 'Runner is not Windows.' }
-          if ($env:RUNNER_ARCH -ne 'X64') { throw 'Runner is not X64.' }
+          echo Runner: %RUNNER_NAME%
+          echo OS: %RUNNER_OS%
+          echo Architecture: %RUNNER_ARCH%
+          echo Machine: %COMPUTERNAME%
+          ver
+          if /I not "%RUNNER_OS%"=="Windows" exit /b 1
+          if /I not "%RUNNER_ARCH%"=="X64" exit /b 1
 
       - name: Check Git and Python
+        shell: cmd
         run: |
           git --version
           python --version
           python -c "import sys; print('Python executable:', sys.executable); print('Python version:', sys.version)"
-          if ($LASTEXITCODE -ne 0) { throw 'Python check failed.' }
 
       - name: Check repository
+        shell: cmd
         run: |
-          if (-not (Test-Path 'bot.py')) { throw 'bot.py not found.' }
-          if (-not (Test-Path 'backend/main.py')) { throw 'backend/main.py not found.' }
-          if (-not (Test-Path 'requirements.txt')) { throw 'requirements.txt not found.' }
-          if (-not (Test-Path 'backend/requirements.txt')) { throw 'backend/requirements.txt not found.' }
+          if not exist bot.py exit /b 1
+          if not exist backend\main.py exit /b 1
+          if not exist requirements.txt exit /b 1
+          if not exist backend\requirements.txt exit /b 1
           git rev-parse --show-toplevel
           git rev-parse --short HEAD
           git status --short
 
       - name: Install project dependencies
+        shell: cmd
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt -r backend/requirements.txt
-          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
+          if errorlevel 1 exit /b 1
+          python -m pip install -r requirements.txt -r backend\requirements.txt
+          if errorlevel 1 exit /b 1
 
       - name: Verify installed dependencies
+        shell: cmd
         run: |
           python -m pip check
-          if ($LASTEXITCODE -ne 0) { throw 'pip check failed.' }
+          if errorlevel 1 exit /b 1
           python -c "import dotenv, openai, telegram, faster_whisper, fastapi, uvicorn; print('All required Python packages imported successfully.')"
-          if ($LASTEXITCODE -ne 0) { throw 'Python dependency import check failed.' }
+          if errorlevel 1 exit /b 1
 
       - name: Validate project Python files
+        shell: cmd
         run: |
-          python -m py_compile bot.py main.py backend/main.py
-          if ($LASTEXITCODE -ne 0) { throw 'Python syntax validation failed.' }
+          python -m py_compile bot.py main.py backend\main.py
+          if errorlevel 1 exit /b 1
 
       - name: Publish runner summary
+        shell: cmd
         run: |
-          @"
-          ## Windows self-hosted runner: OK
-
-          - Runner: `$env:RUNNER_NAME`
-          - Machine: `$env:COMPUTERNAME`
-          - OS: `$env:RUNNER_OS`
-          - Architecture: `$env:RUNNER_ARCH`
-          - Python: $(python --version 2>&1)
-          - Git: $(git --version)
-          - Dependencies: `pip check` OK
-          - Python imports: OK
-          - Syntax checks: OK
-          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          echo ## Windows self-hosted runner: OK>>%GITHUB_STEP_SUMMARY%
+          echo - Runner: %RUNNER_NAME%>>%GITHUB_STEP_SUMMARY%
+          echo - Machine: %COMPUTERNAME%>>%GITHUB_STEP_SUMMARY%
+          echo - OS: %RUNNER_OS%>>%GITHUB_STEP_SUMMARY%
+          echo - Architecture: %RUNNER_ARCH%>>%GITHUB_STEP_SUMMARY%
+          echo - Python:>>%GITHUB_STEP_SUMMARY%
+          python --version 2>>%GITHUB_STEP_SUMMARY%
+          echo - Git:>>%GITHUB_STEP_SUMMARY%
+          git --version>>%GITHUB_STEP_SUMMARY%
+          echo - Dependencies: pip check OK>>%GITHUB_STEP_SUMMARY%
+          echo - Python imports: OK>>%GITHUB_STEP_SUMMARY%
+          echo - Syntax checks: OK>>%GITHUB_STEP_SUMMARY%
