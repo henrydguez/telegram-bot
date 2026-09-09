@@ -43,14 +43,13 @@ jobs:
             if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" set "PYTHON_EXE=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
           )
           if not defined PYTHON_EXE (
-            where winget >nul 2>&1
-            if errorlevel 1 (
-              echo Python 3.12 and winget are unavailable on this runner.
-              exit /b 1
-            )
-            winget install --id Python.Python.3.12 -e --scope user --accept-source-agreements --accept-package-agreements
+            echo System Python 3.12 not found. Installing the official Python NuGet package for CI...
+            if not exist "%RUNNER_TEMP%\nuget.exe" curl.exe -L --fail --silent --show-error -o "%RUNNER_TEMP%\nuget.exe" https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
             if errorlevel 1 exit /b 1
-            if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" set "PYTHON_EXE=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+            rmdir /s /q "%RUNNER_TEMP%\python" 2>nul
+            "%RUNNER_TEMP%\nuget.exe" install python -Version 3.12.10 -ExcludeVersion -OutputDirectory "%RUNNER_TEMP%"
+            if errorlevel 1 exit /b 1
+            if exist "%RUNNER_TEMP%\python\tools\python.exe" set "PYTHON_EXE=%RUNNER_TEMP%\python\tools\python.exe"
           )
           if not defined PYTHON_EXE exit /b 1
           for %%P in ("%PYTHON_EXE%") do set "PYTHON_DIR=%%~dpP"
@@ -59,18 +58,22 @@ jobs:
           if exist "%PYTHON_DIR%Scripts" echo %PYTHON_DIR%Scripts>>%GITHUB_PATH%
           %PYTHON_EXE% --version
           if errorlevel 1 exit /b 1
+          %PYTHON_EXE% -m pip --version
+          if errorlevel 1 exit /b 1
 
       - name: Check Git and Python
         shell: cmd
         run: |
           git --version
           python --version
+          python -m pip --version
           python -c "import sys; print('Python executable:', sys.executable); print('Python version:', sys.version)"
 
       - name: Check repository
         shell: cmd
         run: |
           if not exist bot.py exit /b 1
+          if not exist main.py exit /b 1
           if not exist backend\main.py exit /b 1
           if not exist requirements.txt exit /b 1
           if not exist backend\requirements.txt exit /b 1
