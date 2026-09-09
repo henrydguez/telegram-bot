@@ -45,7 +45,7 @@ $('reportsBack')?.addEventListener('click',()=>show('home'));
 $('formBack')?.addEventListener('click',()=>selectRegisterTab('register'));
 document.querySelectorAll('.register-tab[data-tab="register"]').forEach(button=>button.addEventListener('click',()=>selectRegisterTab('register')));
 document.querySelectorAll('.register-tab[data-tab="movements"]').forEach(button=>button.addEventListener('click',()=>selectRegisterTab('movements')));
-$('movementsBack')?.addEventListener('click',()=>selectRegisterTab('register'));
+$('movementsBack')?.addEventListener('click',()=>show('home'));
 $('saveActive')?.addEventListener('click',saveMovement);
 $('incomeTab')?.addEventListener('click',()=>switchType('income'));
 $('expenseTab')?.addEventListener('click',()=>switchType('expense'));
