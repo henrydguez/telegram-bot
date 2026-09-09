@@ -7,20 +7,34 @@ if (tg) {
   tg.setBackgroundColor('#f5f8fd');
 }
 
+const menu = document.getElementById('menu');
+
 const notify = (message) => {
   if (tg?.showAlert) tg.showAlert(message);
   else alert(message);
 };
 
-const openMovementType = (type) => {
-  notify(type === 'income'
-    ? 'Ingreso seleccionado. Aquí construiremos el registro de ingresos.'
-    : 'Gasto seleccionado. Aquí construiremos el registro de gastos.');
+const renderHome = () => {
+  menu.innerHTML = `
+    <button class="menu-card" id="gastos" type="button">
+      <span class="icon">↕</span>
+      <span class="card-text"><strong>Control de gastos</strong><small>Registra y organiza tus movimientos</small></span>
+      <span class="arrow">›</span>
+    </button>
+    <button class="menu-card" id="informes" type="button">
+      <span class="icon">▥</span>
+      <span class="card-text"><strong>Informes</strong><small>Consulta el resumen de tus finanzas</small></span>
+      <span class="arrow">›</span>
+    </button>
+  `;
+  bindHomeEvents();
 };
 
-document.getElementById('gastos').addEventListener('click', () => {
-  const menu = document.querySelector('.menu');
+const renderMovementMenu = () => {
   menu.innerHTML = `
+    <button class="back-button" id="back-home" type="button" aria-label="Volver a la pantalla de inicio">
+      <span>‹</span> Atrás
+    </button>
     <button class="menu-card" id="income" type="button">
       <span class="icon">＋</span>
       <span class="card-text"><strong>Ingreso</strong><small>Registrar un nuevo ingreso</small></span>
@@ -33,10 +47,16 @@ document.getElementById('gastos').addEventListener('click', () => {
     </button>
   `;
 
-  document.getElementById('income').addEventListener('click', () => openMovementType('income'));
-  document.getElementById('expense').addEventListener('click', () => openMovementType('expense'));
-});
+  document.getElementById('back-home').addEventListener('click', renderHome);
+  document.getElementById('income').addEventListener('click', () => notify('Ingreso seleccionado. Aquí construiremos el registro de ingresos.'));
+  document.getElementById('expense').addEventListener('click', () => notify('Gasto seleccionado. Aquí construiremos el registro de gastos.'));
+};
 
-document.getElementById('informes').addEventListener('click', () => {
-  notify('Informes: módulo preparado para la siguiente fase.');
-});
+const bindHomeEvents = () => {
+  document.getElementById('gastos').addEventListener('click', renderMovementMenu);
+  document.getElementById('informes').addEventListener('click', () => {
+    notify('Informes: módulo preparado para la siguiente fase.');
+  });
+};
+
+bindHomeEvents();
